@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,7 @@ import ReportSharing from "./report-sharing";
 import ManagementMovementApprovals from "./management-movement-approvals";
 import BossDashboard from "./boss-dashboard";
 import StateCoordinatorDashboard from "./state-coordinator-dashboard";
+import OperationalIssues from "./operational-issues";
 
 type Role =
   | "lga_coordinator"
@@ -56,6 +57,7 @@ const navigation: Record<Role, { label: string; icon: string }[]> = {
     { label: "Campaign Readiness", icon: ">" },
     { label: "Device Progress", icon: ">" },
     { label: "Supportive Supervision", icon: ">" },
+    { label: "My Operational Issues", icon: ">" },
     { label: "Movement Requests", icon: ">" },
     { label: "My Reports", icon: ">" },
   ],
@@ -492,9 +494,15 @@ export default function AppShell() {
             <ReportSharing />
           ) : active === "Movement Requests" && user.role === "management_approver" ? (
             <ManagementMovementApprovals />
-          ) : (active === "State Overview" || active === "Reports") && user.role === "boss" ? (
+          ) : (active === "State Overview" && user.role === "senior_supervisor") || ((active === "State Overview" || active === "Reports") && user.role === "boss") ? (
             <BossDashboard />
-          ) : active === "Dashboard" && user.role === "state_coordinator" ? (
+          ) : (active === "Operational Issues" && (user.role === "state_coordinator" || user.role === "senior_supervisor")) ||
+            (active === "My Operational Issues" && user.role === "lga_coordinator") ? (
+            <OperationalIssues
+              userId={user.id}
+              role={user.role as "lga_coordinator" | "state_coordinator" | "senior_supervisor"}
+              lgaId={user.lgaId}
+            />          ) : ((active === "Dashboard" || active === "State Overview") && (user.role === "state_coordinator" || user.role === "senior_supervisor")) ? (
             <StateCoordinatorDashboard userName={user.name} />
           ) : active === "Dashboard" || active === "Executive Dashboard" ? (
             <>
@@ -594,30 +602,3 @@ export default function AppShell() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
