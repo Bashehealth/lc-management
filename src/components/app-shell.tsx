@@ -22,6 +22,7 @@ import ManagementMovementApprovals from "./management-movement-approvals";
 import BossDashboard from "./boss-dashboard";
 import StateCoordinatorDashboard from "./state-coordinator-dashboard";
 import OperationalIssues from "./operational-issues";
+import DashboardOverview from "./dashboard-overview";
 
 type Role =
   | "lga_coordinator"
@@ -466,8 +467,8 @@ export default function AppShell() {
 />
           ) : active === "My Tasks" ? (
             <MyTasks />
-          ) : active === "Working Days" ? (
-            <WorkingDays />
+          ) : active === "Working Days" && user.role === "lga_coordinator" ? (
+            <WorkingDays userId={user.id} lgaId={user.lgaId} />
           ) : active === "Campaign Check-in" && user.role === "lga_coordinator" ? (
             <CampaignCheckin />
           ) : active === "Campaign Readiness" && user.role === "lga_coordinator" ? (
@@ -485,7 +486,7 @@ export default function AppShell() {
           ) : active === "Plans & Tasks" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
             <PlansTasksManagement userId={user.id} role={user.role} />
           ) : active === "Working Days" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
-            <WorkingDaysApprovals />
+            <WorkingDaysApprovals userId={user.id} />
           ) : active === "Campaign Monitoring" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
             <CampaignMonitoring />
           ) : active === "Reports" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
@@ -520,29 +521,7 @@ export default function AppShell() {
                 </div>
               </section>
 
-              <div className="section-heading">
-                <div>
-                  <h2>Operational overview</h2>
-                  <p>Live performance indicators will appear here as operational data is connected.</p>
-                </div>
-                <span className="live-label">DATA INTEGRATION PENDING</span>
-              </div>
-
-              <section className="stats-grid">
-                {[
-                  "Active plans",
-                  "Tasks completed",
-                  "Pending reviews",
-                  "Reports submitted",
-                ].map((label) => (
-                  <article className="stat-card" key={label}>
-                    <div className="stat-label">{label}</div>
-                    <div className="stat-value">â€”</div>
-                    <div className="stat-note">Awaiting live operational data</div>
-                  </article>
-                ))}
-              </section>
-
+              <DashboardOverview lgaId={user.lgaId} />
               <section className="panel quick-panel">
                 <div className="panel-heading">
                   <div>
