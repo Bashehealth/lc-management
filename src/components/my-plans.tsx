@@ -144,8 +144,8 @@ export default function MyPlans({ userId, lgaId }: MyPlansProps) {
   }
 
   useEffect(() => {
-    loadPlanItems();
-    loadPlanStatus();
+    const timer = window.setTimeout(() => { void loadPlanItems(); void loadPlanStatus(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [lgaId, period]);
   function updateForm(field: string, value: string) {
     setForm((previous) => ({ ...previous, [field]: value }));

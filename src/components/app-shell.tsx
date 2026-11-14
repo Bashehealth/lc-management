@@ -23,11 +23,13 @@ import BossDashboard from "./boss-dashboard";
 import StateCoordinatorDashboard from "./state-coordinator-dashboard";
 import OperationalIssues from "./operational-issues";
 import DashboardOverview from "./dashboard-overview";
+import DpmWorkspace from "./dpm-workspace";
 
 type Role =
   | "lga_coordinator"
   | "state_coordinator"
   | "senior_supervisor"
+  | "dpm"
   | "management_approver"
   | "boss";
 
@@ -44,8 +46,9 @@ const roleLabels: Record<Role, string> = {
   lga_coordinator: "LGA Coordinator",
   state_coordinator: "State Coordinator",
   senior_supervisor: "Senior Supervisor",
+  dpm: "DPM",
   management_approver: "Management Approver",
-  boss: "Management Viewer",
+  boss: "Boss",
 };
 
 const navigation: Record<Role, { label: string; icon: string }[]> = {
@@ -88,9 +91,13 @@ const navigation: Record<Role, { label: string; icon: string }[]> = {
   ],
   boss: [
     { label: "Executive Dashboard", icon: ">" },
-    { label: "Monthly Reports", icon: ">" },
     { label: "LGA Comparisons", icon: ">" },
     { label: "Report Archive", icon: ">" },
+  ],
+  dpm: [
+    { label: "DPM Dashboard", icon: "▦" },
+    { label: "Working Days Monitor", icon: "▤" },
+    { label: "Leave Requests", icon: "☷" },
   ],
 };
 
@@ -255,6 +262,7 @@ export default function AppShell() {
         "lga_coordinator",
         "state_coordinator",
         "senior_supervisor",
+        "dpm",
         "management_approver",
         "boss",
       ];
@@ -280,6 +288,15 @@ export default function AppShell() {
       }
 
       if (mounted) {
+        // DPM has its own cross-LGA workspace; never route it through the
+        // generic LGA dashboard, which requires an lga_id.
+        setActive(
+          profile.role === "dpm"
+            ? "DPM Dashboard"
+            : profile.role === "boss"
+              ? "Executive Dashboard"
+              : "Dashboard"
+        );
         setUser({
           id: authUser.id,
           lgaId: profile.lga_id,
@@ -329,7 +346,6 @@ export default function AppShell() {
   if (!user) return <Login />;
 
   const items = navigation[user.role];
-  const isBoss = user.role === "boss";
 
   return (
     <div className="app-layout">
@@ -340,7 +356,7 @@ export default function AppShell() {
             <strong>eHealth LC</strong>
             <span>MANAGEMENT SYSTEM</span>
           </div>
-          <button className="mobile-close" onClick={() => setMobileOpen(false)}>Ã—</button>
+          <button className="mobile-close" onClick={() => setMobileOpen(false)}>×</button>
         </div>
 
         <div className="workspace-label">WORKSPACE</div>
@@ -366,24 +382,17 @@ export default function AppShell() {
             >
               <span className="nav-icon">{item.icon}</span>
               <span>{item.label}</span>
-              {item.label === "Pending Movement Requests" && (
-                <span className="nav-count">4</span>
-              )}
             </button>
           ))}
         </nav>
 
-        {!isBoss && (
+        {!["dpm", "management_approver", "boss"].includes(user.role) && (
           <>
             <div className="nav-heading secondary-heading">ACCOUNT</div>
             <button className="nav-item" onClick={() => setActive("Notifications")}>
               <span className="nav-icon"> - </span>
               Notifications
               <span className="notification-dot" />
-            </button>
-            <button className="nav-item" onClick={() => setActive("My Profile")}>
-              <span className="nav-icon"> - </span>
-              My Profile
             </button>
           </>
         )}
@@ -412,7 +421,7 @@ export default function AppShell() {
 
       <main className="main-area">
         <header className="topbar">
-          <button className="menu-toggle" onClick={() => setMobileOpen(true)}>â˜°</button>
+          <button className="menu-toggle" onClick={() => setMobileOpen(true)}>☰</button>
           <div className="breadcrumb">
             <span>Workspace</span>
             <span>/</span>
@@ -420,7 +429,7 @@ export default function AppShell() {
           </div>
 
           <div className="topbar-right">
-            <button
+            {!["dpm", "management_approver", "boss"].includes(user.role) && <button
               className="icon-button"
               aria-label="Notifications"
               onClick={() => setActive("Notifications")}
@@ -429,7 +438,7 @@ export default function AppShell() {
   <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
   <path d="M10 21h4" />
 </svg>
-            </button>
+            </button>}
             <div className="profile-divider" />
             <div className="profile-summary">
               <div className="avatar">{user.initials}</div>
@@ -458,7 +467,9 @@ export default function AppShell() {
             <div className="date-label">{new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</div>
           </div>
 
-          {active === "Notifications" && ["lga_coordinator", "state_coordinator", "senior_supervisor"].includes(user.role) ? (
+          {user.role === "dpm" && ["DPM Dashboard", "Working Days Monitor", "Leave Requests"].includes(active) ? (
+            <DpmWorkspace section={active as "DPM Dashboard" | "Working Days Monitor" | "Leave Requests"} />
+          ) : active === "Notifications" && ["lga_coordinator", "state_coordinator", "senior_supervisor"].includes(user.role) ? (
             <FeedbackInbox userId={user.id} role={user.role as "lga_coordinator" | "state_coordinator" | "senior_supervisor"} />
           ) : active === "My Plans" ? (
             <MyPlans
@@ -466,21 +477,23 @@ export default function AppShell() {
   lgaId={user.lgaId}
 />
           ) : active === "My Tasks" ? (
-            <MyTasks />
+            user.role === "lga_coordinator" ? <MyTasks userId={user.id} lgaId={user.lgaId} /> : <section className="panel" role="alert"><h2>Access restricted</h2><p>My Tasks is available only to an LGA Coordinator.</p></section>
           ) : active === "Working Days" && user.role === "lga_coordinator" ? (
             <WorkingDays userId={user.id} lgaId={user.lgaId} />
           ) : active === "Campaign Check-in" && user.role === "lga_coordinator" ? (
-            <CampaignCheckin />
+            <CampaignCheckin userId={user.id} lgaId={user.lgaId} />
           ) : active === "Campaign Readiness" && user.role === "lga_coordinator" ? (
-            <CampaignReadiness />
+            <CampaignReadiness userId={user.id} lgaId={user.lgaId} />
           ) : active === "Device Progress" && user.role === "lga_coordinator" ? (
-            <DeviceProgress />
+            <DeviceProgress userId={user.id} lgaId={user.lgaId} />
           ) : active === "Supportive Supervision" && user.role === "lga_coordinator" ? (
-            <SupportiveSupervision />
+            <SupportiveSupervision userId={user.id} lgaId={user.lgaId} />
           ) : active === "Movement Requests" && user.role === "lga_coordinator" ? (
-            <MovementRequests />
+            <MovementRequests userId={user.id} lgaId={user.lgaId} role="lga_coordinator" />
+          ) : active === "Movement Requests" && user.role === "state_coordinator" ? (
+            <MovementRequests userId={user.id} role="state_coordinator" />
           ) : active === "My Reports" && user.role === "lga_coordinator" ? (
-            <MyReports />
+            <MyReports userId={user.id} lgaId={user.lgaId} />
           ) : active === "LGA Performance" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
             <LGAPerformance />
           ) : active === "Plans & Tasks" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
@@ -488,14 +501,22 @@ export default function AppShell() {
           ) : active === "Working Days" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
             <WorkingDaysApprovals userId={user.id} />
           ) : active === "Campaign Monitoring" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
-            <CampaignMonitoring />
+            <CampaignMonitoring userId={user.id} role={user.role as "state_coordinator" | "senior_supervisor"} />
           ) : active === "Reports" && (user.role === "state_coordinator" || user.role === "senior_supervisor") ? (
-            <StateReportConsolidation />
-          ) : active === "Report Sharing" && (user.role === "senior_supervisor" || user.role === "boss") ? (
+            <StateReportConsolidation userId={user.id} role={user.role as "state_coordinator" | "senior_supervisor"} />
+          ) : (active === "Report Sharing" || active === "Management Sharing") && user.role === "senior_supervisor" ? (
             <ReportSharing />
-          ) : active === "Movement Requests" && user.role === "management_approver" ? (
-            <ManagementMovementApprovals />
-          ) : (active === "State Overview" && user.role === "senior_supervisor") || ((active === "State Overview" || active === "Reports") && user.role === "boss") ? (
+          ) : (active === "Movement Requests" || active === "Pending Movement Requests") && user.role === "management_approver" ? (
+            <ManagementMovementApprovals userId={user.id} />
+          ) : active === "Decision History" && user.role === "management_approver" ? (
+            <ManagementMovementApprovals historyOnly userId={user.id} />
+          ) : active === "Report Consolidation" && user.role === "senior_supervisor" ? (
+            <StateReportConsolidation userId={user.id} role="senior_supervisor" />
+          ) : active === "LGA Comparisons" && user.role === "boss" ? (
+            <BossDashboard view="comparisons" />
+          ) : active === "Report Archive" && user.role === "boss" ? (
+            <BossDashboard view="archive" />
+          ) : active === "Reports" && user.role === "boss" ? (
             <BossDashboard />
           ) : (active === "Operational Issues" && (user.role === "state_coordinator" || user.role === "senior_supervisor")) ||
             (active === "My Operational Issues" && user.role === "lga_coordinator") ? (
@@ -505,7 +526,15 @@ export default function AppShell() {
               lgaId={user.lgaId}
             />          ) : ((active === "Dashboard" || active === "State Overview") && (user.role === "state_coordinator" || user.role === "senior_supervisor")) ? (
             <StateCoordinatorDashboard userName={user.name} />
-          ) : active === "Dashboard" || active === "Executive Dashboard" ? (
+          ) : active === "Executive Dashboard" && user.role === "boss" ? (
+            <BossDashboard />
+          ) : active === "Dashboard" && user.role === "management_approver" ? (
+            <section className="panel">
+              <h2>Movement approval workspace</h2>
+              <p>Use Pending Movement Requests to review requests forwarded by the State Coordinator.</p>
+              <p>Record the required decision note before approving or rejecting a request.</p>
+            </section>
+          ) : active === "Dashboard" ? (
             <>
               <section className="welcome-banner">
                 <div>
@@ -537,7 +566,7 @@ export default function AppShell() {
                       <button key={item.label} onClick={() => setActive(item.label)}>
                         <span className="quick-icon">{item.icon}</span>
                         <strong>{item.label}</strong>
-                        <span className="quick-arrow">â†’</span>
+                        <span className="quick-arrow">→</span>
                       </button>
                     ))}
                 </div>

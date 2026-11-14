@@ -232,7 +232,8 @@ export default function StateCoordinatorDashboard({
   }, [])
 
   useEffect(() => {
-    void loadMetrics()
+    const timer = window.setTimeout(() => { void loadMetrics() }, 0)
+    return () => window.clearTimeout(timer)
   }, [loadMetrics])
 
   const currentMonth = new Date().toLocaleDateString("en-GB", {

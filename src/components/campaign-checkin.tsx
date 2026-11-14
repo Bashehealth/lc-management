@@ -1,25 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function dateKey(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 type Checkin = {
-  id: number;
-  date: string;
-  time: string;
+  id: string;
+  checkin_date: string;
+  checked_in_at: string;
   latitude: number;
   longitude: number;
-  accuracy: number;
-  status: string;
+  accuracy_meters: number | null;
 };
 
-export default function CampaignCheckin() {
+export default function CampaignCheckin({ userId, lgaId }: { userId: string; lgaId: string | null }) {
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [location, setLocation] = useState<{
     latitude: number;
@@ -28,7 +27,35 @@ export default function CampaignCheckin() {
   } | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [notice, setNotice] = useState("");
-  const [deadline, setDeadline] = useState("10:30");
+  const [error, setError] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [timeZone, setTimeZone] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!lgaId) { setError("Your account is not assigned to an LGA."); setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    const db = createClient();
+    const [settingsResult, historyResult] = await Promise.all([
+      db.from("campaign_settings").select("checkin_deadline,timezone,checkin_enabled").eq("lga_id", lgaId).maybeSingle(),
+      db.from("campaign_checkins").select("id,checkin_date,checked_in_at,latitude,longitude,accuracy_meters").eq("lga_id", lgaId).order("checked_in_at", { ascending: false }).limit(100),
+    ]);
+    const failure = settingsResult.error ?? historyResult.error;
+    if (failure) setError(failure.message);
+    else if (!settingsResult.data) setError("Campaign check-in is not configured for this LGA.");
+    else {
+      setDeadline(String(settingsResult.data.checkin_deadline).slice(0, 5));
+      setTimeZone(settingsResult.data.timezone);
+      setEnabled(settingsResult.data.checkin_enabled);
+      setCheckins((historyResult.data ?? []) as Checkin[]);
+    }
+    setLoading(false);
+  }, [lgaId]);
+
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
   function captureLocation() {
     if (!navigator.geolocation) {
@@ -63,44 +90,47 @@ export default function CampaignCheckin() {
     );
   }
 
-  function submitCheckin() {
+  async function submitCheckin() {
     if (!location) {
       setNotice("Capture your location before submitting a check-in.");
       return;
     }
+    if (!lgaId || !userId || !timeZone || !enabled || saving) return;
 
     const now = new Date();
-    const date = getLocalDateKey(now);
+    const date = dateKey(now, timeZone);
 
-    if (checkins.some((item) => item.date === date)) {
+    if (checkins.some((item) => item.checkin_date === date)) {
       setNotice("A check-in has already been recorded for today.");
       return;
     }
 
-    const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-
-    const status = time > deadline ? "Late" : "On time";
-
-    setCheckins((previous) => [{
-      id: Date.now(),
-      date,
-      time,
+    setSaving(true); setError(""); setNotice("");
+    const { error: insertError } = await createClient().from("campaign_checkins").insert({
+      lga_id: lgaId,
+      checkin_date: date,
+      checked_in_at: now.toISOString(),
       latitude: location.latitude,
       longitude: location.longitude,
-      accuracy: location.accuracy,
-      status,
-    }, ...previous]);
-
-    setLocation(null);
-    setNotice("Check-in recorded in demo mode. Database submission is not connected.");
+      accuracy_meters: location.accuracy,
+      location_source: "manual",
+      submitted_by: userId,
+    });
+    if (insertError) setError(insertError.message);
+    else { setLocation(null); setNotice("Check-in saved."); await load(); }
+    setSaving(false);
   }
+
+  const today = timeZone ? dateKey(new Date(), timeZone) : "";
+  const todaysCheckin = checkins.find((item) => item.checkin_date === today);
+  const statusFor = (item: Checkin) => new Date(item.checked_in_at).toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }) <= deadline ? "On time" : "Late";
 
   return (
     <div className="checkin-module">
-      {notice && (
+      {(error || notice) && (
         <div className="plans-notice">
-          <span>{notice}</span>
-          <button onClick={() => setNotice("")}>×</button>
+          <span role={error ? "alert" : "status"}>{error || notice}</span>
+          <button type="button" onClick={() => { setNotice(""); setError(""); }}>×</button>
         </div>
       )}
 
@@ -110,14 +140,14 @@ export default function CampaignCheckin() {
           <h2>Campaign Check-in</h2>
           <p>Record your field check-in with timestamp and location evidence.</p>
         </div>
-        <span className="plan-draft-badge">DEMO MODE</span>
+          <span className="live-label">LGA RECORDS</span>
       </div>
 
       <div className="checkin-summary-grid">
         <article className="plan-summary-card">
-          <span>Today's check-in</span>
-          <strong>{checkins.length ? "1" : "0"}</strong>
-          <small>Submitted records</small>
+          <span>Today&apos;s check-in</span>
+          <strong>{loading ? "…" : todaysCheckin ? "1" : "0"}</strong>
+          <small>Persistent submissions</small>
         </article>
         <article className="plan-summary-card">
           <span>Submission deadline</span>
@@ -132,9 +162,9 @@ export default function CampaignCheckin() {
         <article className="plan-summary-card">
           <span>Check-in status</span>
           <strong className="checkin-status-value">
-            {checkins.length ? checkins[0].status : "Pending"}
+            {todaysCheckin ? statusFor(todaysCheckin) : "Pending"}
           </strong>
-          <small>Today's submission</small>
+          <small>Today&apos;s submission</small>
         </article>
       </div>
 
@@ -198,10 +228,11 @@ export default function CampaignCheckin() {
 
             <button
               className="primary-button"
-              onClick={submitCheckin}
-              disabled={!location || checkins.some((item) => item.date === getLocalDateKey())}
+              type="button"
+              onClick={() => void submitCheckin()}
+              disabled={!location || !enabled || !lgaId || saving || Boolean(todaysCheckin)}
             >
-              Submit check-in →
+              {saving ? "Saving…" : "Submit check-in →"}
             </button>
           </div>
         </div>
@@ -210,13 +241,14 @@ export default function CampaignCheckin() {
           <strong>Daily submission deadline</strong>
           <p>Submissions after the configured deadline are flagged for supervisor review. A late check-in is not automatically rejected.</p>
           <label>
-            Demo deadline
+            Configured deadline
             <input
               type="time"
               value={deadline}
-              onChange={(event) => setDeadline(event.target.value)}
+              readOnly
             />
           </label>
+          {!enabled && <p role="status">Check-ins are currently disabled for this LGA.</p>}
         </div>
       </section>
 
@@ -224,23 +256,23 @@ export default function CampaignCheckin() {
         <div className="panel-heading">
           <div>
             <h3>Check-in history</h3>
-            <p>Previously submitted check-in records</p>
+            <p>Saved check-in records for this LGA</p>
           </div>
-          <span className="live-label">{checkins.length} RECORDS</span>
+          <button type="button" className="secondary-button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
         </div>
 
-        {checkins.length === 0 ? (
+        {loading ? <div className="plan-empty">Loading check-in history…</div> : checkins.length === 0 ? (
           <div className="plan-empty">
             <div className="working-empty-icon">◎</div>
             <strong>No check-ins recorded</strong>
-            <p>Your submitted check-ins will appear here.</p>
+            <p>Your saved check-ins will appear here.</p>
           </div>
         ) : (
           checkins.map((item) => (
             <article className="checkin-history-row" key={item.id}>
               <div>
-                <strong>{item.date}</strong>
-                <span>{item.time}</span>
+                <strong>{item.checkin_date}</strong>
+                <span>{new Date(item.checked_in_at).toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" })}</span>
               </div>
               <div>
                 <span>GPS coordinates</span>
@@ -248,10 +280,10 @@ export default function CampaignCheckin() {
               </div>
               <div>
                 <span>Accuracy</span>
-                <strong>{Math.round(item.accuracy)}m</strong>
+                <strong>{item.accuracy_meters == null ? "—" : `${Math.round(item.accuracy_meters)}m`}</strong>
               </div>
-              <span className={`plan-status ${item.status === "On time" ? "plan-status-completed" : "plan-status-returned"}`}>
-                {item.status}
+              <span className={`plan-status ${statusFor(item) === "On time" ? "plan-status-completed" : "plan-status-returned"}`}>
+                {statusFor(item)}
               </span>
             </article>
           ))

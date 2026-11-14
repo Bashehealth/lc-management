@@ -1,387 +1,105 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type VisitRecord = {
-  id: number;
-  date: string;
-  campaign: string;
-  task: string;
-  ward: string;
-  settlement: string;
-  teamCode: string;
-  latitude: number | null;
-  longitude: number | null;
-  accuracy: number | null;
-  observations: string;
-  followUp: string;
-  evidence: string[];
+  id: string; campaign_name: string; task_id: string | null; ward: string; settlement: string; team_code: string;
+  visited_at: string; latitude: number; longitude: number; accuracy_meters: number | null; observations: string;
 };
+type TaskOption = { id: string; title: string };
+const initialForm = { campaign: "", taskId: "", ward: "", settlement: "", teamCode: "", observations: "", followUp: "" };
 
-const initialForm = {
-  campaign: "",
-  task: "",
-  ward: "",
-  settlement: "",
-  teamCode: "",
-  observations: "",
-  followUp: "",
-};
-
-function localTimestamp() {
-  return new Date().toLocaleString("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-export default function SupportiveSupervision() {
+export default function SupportiveSupervision({ userId, lgaId }: { userId: string; lgaId: string | null }) {
   const [form, setForm] = useState(initialForm);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
-  const [location, setLocation] = useState<{
-    latitude: number;
-    longitude: number;
-    accuracy: number;
-  } | null>(null);
-  const [evidence, setEvidence] = useState<string[]>([]);
+  const [tasks, setTasks] = useState<TaskOption[]>([]);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  function updateField(field: keyof typeof initialForm, value: string) {
-    setForm((previous) => ({ ...previous, [field]: value }));
-  }
+  const load = useCallback(async () => {
+    if (!lgaId) { setError("Your account is not assigned to an LGA."); setLoading(false); return; }
+    setLoading(true); setError("");
+    const db = createClient();
+    const [visitsResult, tasksResult] = await Promise.all([
+      db.from("supportive_supervision_visits").select("id,campaign_name,task_id,ward,settlement,team_code,visited_at,latitude,longitude,accuracy_meters,observations").eq("lga_id", lgaId).order("visited_at", { ascending: false }).limit(100),
+      db.from("tasks").select("id,title").eq("lga_id", lgaId).order("title"),
+    ]);
+    const failure = visitsResult.error ?? tasksResult.error;
+    if (failure) setError(failure.message);
+    else { setVisits((visitsResult.data ?? []) as VisitRecord[]); setTasks((tasksResult.data ?? []) as TaskOption[]); }
+    setLoading(false);
+  }, [lgaId]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
+  function updateField(field: keyof typeof initialForm, value: string) { setForm((previous) => ({ ...previous, [field]: value })); }
   function captureLocation() {
-    if (!navigator.geolocation) {
-      setNotice("Geolocation is not supported by this browser.");
-      return;
-    }
-
-    setCapturing(true);
-    setNotice("Requesting current location...");
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        });
-        setCapturing(false);
-        setNotice("Visit location captured.");
-      },
-      (error) => {
-        setCapturing(false);
-        setNotice(
-          error.code === error.PERMISSION_DENIED
-            ? "Location permission denied. Allow location access and try again."
-            : error.code === error.TIMEOUT
-              ? "Location request timed out. Try again."
-              : "Unable to capture location."
-        );
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-    );
+    if (!navigator.geolocation) { setNotice("Geolocation is not supported by this browser."); return; }
+    setCapturing(true); setNotice("Requesting current location...");
+    navigator.geolocation.getCurrentPosition((position) => {
+      setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
+      setCapturing(false); setNotice("Visit location captured.");
+    }, (geoError) => {
+      setCapturing(false);
+      setNotice(geoError.code === geoError.PERMISSION_DENIED ? "Location permission denied. Allow location access and try again." : geoError.code === geoError.TIMEOUT ? "Location request timed out. Try again." : "Unable to capture location.");
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   }
 
-  function addEvidence(files: FileList | null) {
-    if (!files) return;
-
-    const names = Array.from(files).map((file) => file.name);
-    setEvidence((previous) => [...previous, ...names]);
-  }
-
-  function removeEvidence(index: number) {
-    setEvidence((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
-  }
-
-  function submitVisit(event: React.FormEvent<HTMLFormElement>) {
+  async function submitVisit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (
-      !form.campaign.trim() ||
-      !form.task.trim() ||
-      !form.ward.trim() ||
-      !form.settlement.trim() ||
-      !form.teamCode.trim() ||
-      !form.observations.trim()
-    ) {
-      setNotice("Complete all required visit details and observations.");
-      return;
-    }
-
-    const visit: VisitRecord = {
-      id: Date.now(),
-      date: localTimestamp(),
-      campaign: form.campaign.trim(),
-      task: form.task.trim(),
-      ward: form.ward.trim(),
-      settlement: form.settlement.trim(),
-      teamCode: form.teamCode.trim(),
-      latitude: location?.latitude ?? null,
-      longitude: location?.longitude ?? null,
-      accuracy: location?.accuracy ?? null,
-      observations: form.observations.trim(),
-      followUp: form.followUp.trim(),
-      evidence: [...evidence],
-    };
-
-    setVisits((previous) => [visit, ...previous]);
-    setForm(initialForm);
-    setLocation(null);
-    setEvidence([]);
-    setNotice("Supervision visit recorded in demo mode. Database submission is not connected.");
+    if (!lgaId || !userId || !location) { setNotice("Capture GPS and confirm your assigned LGA before submitting."); return; }
+    if (!form.taskId) { setNotice("Select an existing LGA task to link this visit."); return; }
+    if (saving) return;
+    setSaving(true); setError(""); setNotice("");
+    const observations = form.followUp.trim() ? `${form.observations.trim()}\n\nFollow-up required: ${form.followUp.trim()}` : form.observations.trim();
+    const { error: insertError } = await createClient().from("supportive_supervision_visits").insert({
+      lga_id: lgaId, submitted_by: userId, task_id: form.taskId, campaign_name: form.campaign.trim(), ward: form.ward.trim(),
+      settlement: form.settlement.trim(), team_code: form.teamCode.trim(), visited_at: new Date().toISOString(),
+      latitude: location.latitude, longitude: location.longitude, accuracy_meters: location.accuracy, observations,
+    });
+    if (insertError) setError(insertError.message);
+    else { setForm(initialForm); setLocation(null); setNotice("Supervision visit saved."); await load(); }
+    setSaving(false);
   }
 
   return (
     <div className="supervision-module">
-      {notice && (
-        <div className="plans-notice">
-          <span>{notice}</span>
-          <button onClick={() => setNotice("")}>×</button>
-        </div>
-      )}
-
-      <div className="supervision-heading">
-        <div>
-          <span className="eyebrow">FUNE LOCAL GOVERNMENT AREA</span>
-          <h2>Supportive Supervision</h2>
-          <p>Record and document field supervision visits linked to campaign tasks.</p>
-        </div>
-        <span className="plan-draft-badge">DEMO MODE</span>
-      </div>
-
+      {(notice || error) && <div className="plans-notice"><span role={error ? "alert" : "status"}>{error || notice}</span><button onClick={() => { setNotice(""); setError(""); }}>×</button></div>}
+      <div className="supervision-heading"><div><span className="eyebrow">ASSIGNED LGA</span><h2>Supportive Supervision</h2><p>Record field supervision visits linked to campaign tasks.</p></div><span className="live-label">LGA VISITS</span></div>
       <div className="supervision-summary-grid">
-        <article className="plan-summary-card">
-          <span>Total visits</span>
-          <strong>{visits.length}</strong>
-          <small>Recorded in this session</small>
-        </article>
-        <article className="plan-summary-card">
-          <span>Evidence references</span>
-          <strong>{visits.reduce((sum, visit) => sum + visit.evidence.length, 0)}</strong>
-          <small>Selected file references</small>
-        </article>
-        <article className="plan-summary-card">
-          <span>GPS captured</span>
-          <strong>{visits.filter((visit) => visit.latitude !== null).length}</strong>
-          <small>Visits with location evidence</small>
-        </article>
-        <article className="plan-summary-card">
-          <span>Follow-up required</span>
-          <strong>{visits.filter((visit) => visit.followUp.trim()).length}</strong>
-          <small>Visits with recorded actions</small>
-        </article>
+        <article className="plan-summary-card"><span>Total visits</span><strong>{loading ? "…" : visits.length}</strong><small>Saved records</small></article>
+        <article className="plan-summary-card"><span>GPS captured</span><strong>{visits.length}</strong><small>Required on saved visits</small></article>
+        <article className="plan-summary-card"><span>Follow-up required</span><strong>{visits.filter((visit) => visit.observations.includes("Follow-up required:")).length}</strong><small>Saved action notes</small></article>
+        <article className="plan-summary-card"><span>Available tasks</span><strong>{tasks.length}</strong><small>In this LGA</small></article>
       </div>
-
       <section className="panel supervision-form-panel">
-        <div className="panel-heading">
-          <div>
-            <h3>Record a field visit</h3>
-            <p>Each submission creates a separate supervision visit record.</p>
-          </div>
-          <span className="live-label">NEW VISIT</span>
-        </div>
-
-        <form onSubmit={submitVisit}>
+        <div className="panel-heading"><div><h3>Record a field visit</h3><p>Visit records require an existing task and captured GPS coordinates.</p></div><span className="live-label">NEW VISIT</span></div>
+        {tasks.length === 0 && !loading ? <div className="plan-empty">No LGA tasks are available to link to a visit.</div> : <form onSubmit={submitVisit}>
           <div className="supervision-fields-grid">
-            <label className="supervision-field">
-              <span>Campaign name *</span>
-              <input
-                value={form.campaign}
-                onChange={(event) => updateField("campaign", event.target.value)}
-                placeholder="Enter campaign name"
-                required
-              />
-            </label>
-
-            <label className="supervision-field">
-              <span>Linked operational task *</span>
-              <input
-                value={form.task}
-                onChange={(event) => updateField("task", event.target.value)}
-                placeholder="Enter or select task reference"
-                required
-              />
-              <small>Task-library linking will be connected to the database.</small>
-            </label>
-
-            <label className="supervision-field">
-              <span>Ward *</span>
-              <input
-                value={form.ward}
-                onChange={(event) => updateField("ward", event.target.value)}
-                placeholder="Enter ward"
-                required
-              />
-            </label>
-
-            <label className="supervision-field">
-              <span>Settlement *</span>
-              <input
-                value={form.settlement}
-                onChange={(event) => updateField("settlement", event.target.value)}
-                placeholder="Enter settlement"
-                required
-              />
-            </label>
-
-            <label className="supervision-field">
-              <span>Team code *</span>
-              <input
-                value={form.teamCode}
-                onChange={(event) => updateField("teamCode", event.target.value)}
-                placeholder="Enter team code"
-                required
-              />
-            </label>
-
-            <div className="supervision-field">
-              <span>Visit location</span>
-              <div className="supervision-location-box">
-                {location ? (
-                  <>
-                    <strong>Location captured</strong>
-                    <small>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</small>
-                    <small>Accuracy: {Math.round(location.accuracy)} metres</small>
-                  </>
-                ) : (
-                  <small>GPS location has not been captured.</small>
-                )}
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={captureLocation}
-                  disabled={capturing}
-                >
-                  {capturing ? "Capturing..." : location ? "Refresh GPS" : "Capture GPS"}
-                </button>
-              </div>
-            </div>
-
-            <label className="supervision-field supervision-field-wide">
-              <span>Supervision observations *</span>
-              <textarea
-                rows={4}
-                value={form.observations}
-                onChange={(event) => updateField("observations", event.target.value)}
-                placeholder="Record observations, findings, team performance and issues observed..."
-                required
-              />
-            </label>
-
-            <label className="supervision-field supervision-field-wide">
-              <span>Follow-up actions required</span>
-              <textarea
-                rows={3}
-                value={form.followUp}
-                onChange={(event) => updateField("followUp", event.target.value)}
-                placeholder="Record corrective actions, responsible persons or support required..."
-              />
-            </label>
-
-            <div className="supervision-field supervision-field-wide">
-              <span>Visit evidence</span>
-              <div className="supervision-evidence-box">
-                <p>Select one or more photos as evidence references.</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(event) => {
-                    addEvidence(event.target.files);
-                    event.target.value = "";
-                  }}
-                />
-
-                {evidence.length > 0 && (
-                  <div className="supervision-evidence-list">
-                    {evidence.map((name, index) => (
-                      <div key={`${name}-${index}`}>
-                        <span>{name}</span>
-                        <button type="button" onClick={() => removeEvidence(index)}>Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <small>Demo mode records filenames only. Actual image upload and secure storage are not connected.</small>
-              </div>
-            </div>
+            <label className="supervision-field"><span>Campaign name *</span><input value={form.campaign} onChange={(event) => updateField("campaign", event.target.value)} required /></label>
+            <label className="supervision-field"><span>Linked operational task *</span><select value={form.taskId} onChange={(event) => updateField("taskId", event.target.value)} required><option value="">Select an LGA task</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+            <label className="supervision-field"><span>Ward *</span><input value={form.ward} onChange={(event) => updateField("ward", event.target.value)} required /></label>
+            <label className="supervision-field"><span>Settlement *</span><input value={form.settlement} onChange={(event) => updateField("settlement", event.target.value)} required /></label>
+            <label className="supervision-field"><span>Team code *</span><input value={form.teamCode} onChange={(event) => updateField("teamCode", event.target.value)} required /></label>
+            <div className="supervision-field"><span>Visit location *</span><div className="supervision-location-box">{location ? <><strong>Location captured</strong><small>{location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</small><small>Accuracy: {Math.round(location.accuracy)} metres</small></> : <small>GPS location has not been captured.</small>}<button type="button" className="secondary-button" onClick={captureLocation} disabled={capturing}>{capturing ? "Capturing…" : location ? "Refresh GPS" : "Capture GPS"}</button></div></div>
+            <label className="supervision-field supervision-field-wide"><span>Supervision observations *</span><textarea rows={4} value={form.observations} onChange={(event) => updateField("observations", event.target.value)} required /></label>
+            <label className="supervision-field supervision-field-wide"><span>Follow-up actions required</span><textarea rows={3} value={form.followUp} onChange={(event) => updateField("followUp", event.target.value)} /></label>
+            <div className="supervision-field supervision-field-wide"><span>Visit evidence</span><small>Secure storage is not configured. No files are uploaded or attached to this visit.</small></div>
           </div>
-
-          <button className="primary-button" type="submit">
-            Save supervision visit →
-          </button>
-        </form>
+          <button className="primary-button" type="submit" disabled={saving || loading || !lgaId || !location}>{saving ? "Saving…" : "Save supervision visit →"}</button>
+        </form>}
       </section>
-
       <section className="panel supervision-history-panel">
-        <div className="panel-heading">
-          <div>
-            <h3>Supervision visit history</h3>
-            <p>Each visit is retained as a separate record in this session.</p>
-          </div>
-          <span className="live-label">{visits.length} VISITS</span>
-        </div>
-
-        {visits.length === 0 ? (
-          <div className="plan-empty">
-            <div className="working-empty-icon">◎</div>
-            <strong>No supervision visits recorded</strong>
-            <p>Completed field visits will appear here.</p>
-          </div>
-        ) : (
-          visits.map((visit) => (
-            <article className="supervision-history-card" key={visit.id}>
-              <div className="supervision-history-header">
-                <div>
-                  <strong>{visit.campaign}</strong>
-                  <span>{visit.date}</span>
-                </div>
-                <span className="plan-status plan-status-ongoing">{visit.teamCode}</span>
-              </div>
-
-              <div className="supervision-history-details">
-                <div><span>Task</span><strong>{visit.task}</strong></div>
-                <div><span>Ward</span><strong>{visit.ward}</strong></div>
-                <div><span>Settlement</span><strong>{visit.settlement}</strong></div>
-              </div>
-
-              <p className="supervision-observation-text">{visit.observations}</p>
-
-              {visit.latitude !== null && visit.longitude !== null && (
-                <div className="supervision-gps-reference">
-                  GPS: {visit.latitude.toFixed(6)}, {visit.longitude.toFixed(6)}
-                  {" "}· Accuracy: {Math.round(visit.accuracy ?? 0)}m
-                </div>
-              )}
-
-              {visit.followUp && (
-                <div className="supervision-followup">
-                  <strong>Follow-up required</strong>
-                  <p>{visit.followUp}</p>
-                </div>
-              )}
-
-              {visit.evidence.length > 0 && (
-                <div className="supervision-history-evidence">
-                  <strong>Evidence references ({visit.evidence.length})</strong>
-                  <ul>
-                    {visit.evidence.map((name, index) => (
-                      <li key={`${name}-${index}`}>{name}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </article>
-          ))
-        )}
+        <div className="panel-heading"><div><h3>Supervision visit history</h3><p>Saved records for this LGA</p></div><button type="button" className="secondary-button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button></div>
+        {loading ? <div className="plan-empty">Loading visits…</div> : error ? <div className="plan-empty" role="alert">{error}</div> : visits.length === 0 ? <div className="plan-empty"><div className="working-empty-icon">◎</div><strong>No supervision visits recorded</strong><p>Saved field visits will appear here.</p></div> : visits.map((visit) => (
+          <article className="supervision-history-card" key={visit.id}><div className="supervision-history-header"><div><strong>{visit.campaign_name}</strong><span>{new Date(visit.visited_at).toLocaleString()}</span></div><span className="plan-status plan-status-ongoing">{visit.team_code}</span></div><div className="supervision-history-details"><div><span>Task</span><strong>{tasks.find((task) => task.id === visit.task_id)?.title ?? "Task reference unavailable"}</strong></div><div><span>Ward</span><strong>{visit.ward}</strong></div><div><span>Settlement</span><strong>{visit.settlement}</strong></div></div><p className="supervision-observation-text">{visit.observations}</p><div className="supervision-gps-reference">GPS: {visit.latitude.toFixed(6)}, {visit.longitude.toFixed(6)} · Accuracy: {Math.round(visit.accuracy_meters ?? 0)}m</div></article>
+        ))}
       </section>
-
-      <div className="checkin-privacy-note">
-        <strong>Field evidence and privacy</strong>
-        <p>Location is captured only when requested. This interface does not implement background tracking or facial recognition. Evidence filenames are temporary references only; secure upload, access controls and retention rules will be implemented before production use.</p>
-      </div>
+      <div className="checkin-privacy-note"><strong>Field evidence and privacy</strong><p>Location is captured only when requested. No background tracking is used. File upload remains unavailable until secure storage is configured.</p></div>
     </div>
   );
 }

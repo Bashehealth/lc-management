@@ -1,49 +1,47 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-type DeviceRecord = {
-  id: number;
-  date: string;
-  activity: string;
-  expected: number;
-  completed: number;
-  pending: number;
-  description: string;
-  blockers: string;
-  evidence: string;
-};
+type DeviceRecord = { id: string; reported_at: string; activity_category: string; device_name: string; expected_quantity: number; completed_quantity: number; pending_quantity: number; progress_description: string | null; blockers: string | null };
 
-function localDateKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-export default function DeviceProgress() {
+export default function DeviceProgress({ userId, lgaId }: { userId: string; lgaId: string | null }) {
   const [records, setRecords] = useState<DeviceRecord[]>([]);
   const [activity, setActivity] = useState("");
   const [expected, setExpected] = useState("");
   const [completed, setCompleted] = useState("");
   const [description, setDescription] = useState("");
   const [blockers, setBlockers] = useState("");
-  const [evidence, setEvidence] = useState("");
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deviceName, setDeviceName] = useState("");
 
-  const expectedTotal = records.reduce((sum, item) => sum + item.expected, 0);
-  const completedTotal = records.reduce((sum, item) => sum + item.completed, 0);
-  const pendingTotal = records.reduce((sum, item) => sum + item.pending, 0);
+  const load = useCallback(async () => {
+    if (!lgaId) { setError("Your account is not assigned to an LGA."); setLoading(false); return; }
+    setLoading(true); setError("");
+    const { data, error: queryError } = await createClient().from("campaign_device_progress").select("id,reported_at,activity_category,device_name,expected_quantity,completed_quantity,pending_quantity,progress_description,blockers").eq("lga_id", lgaId).order("reported_at", { ascending: false }).limit(100);
+    if (queryError) setError(queryError.message); else setRecords((data ?? []) as DeviceRecord[]);
+    setLoading(false);
+  }, [lgaId]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
+
+  const expectedTotal = records.reduce((sum, item) => sum + item.expected_quantity, 0);
+  const completedTotal = records.reduce((sum, item) => sum + item.completed_quantity, 0);
+  const pendingTotal = records.reduce((sum, item) => sum + item.pending_quantity, 0);
   const achievement = expectedTotal > 0
     ? Math.round((completedTotal / expectedTotal) * 100)
     : 0;
 
-  function submitProgress(event: React.FormEvent<HTMLFormElement>) {
+  async function submitProgress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const expectedCount = Number(expected);
     const completedCount = Number(completed);
 
     if (
-      !activity.trim() ||
+      !activity.trim() || !deviceName.trim() ||
       expected.trim() === "" ||
       completed.trim() === "" ||
       !Number.isInteger(expectedCount) ||
@@ -60,46 +58,41 @@ export default function DeviceProgress() {
       return;
     }
 
-    setRecords((previous) => [
-      {
-        id: Date.now(),
-        date: localDateKey(),
-        activity: activity.trim(),
-        expected: expectedCount,
-        completed: completedCount,
-        pending: expectedCount - completedCount,
-        description: description.trim(),
-        blockers: blockers.trim(),
-        evidence: evidence.trim(),
-      },
-      ...previous,
-    ]);
-
+    if (!lgaId || !userId || saving) return;
+    setSaving(true); setError(""); setNotice("");
+    const { error: insertError } = await createClient().from("campaign_device_progress").insert({
+      lga_id: lgaId, submitted_by: userId, activity_category: activity.trim(), device_name: deviceName.trim(),
+      expected_quantity: expectedCount, completed_quantity: completedCount, pending_quantity: expectedCount - completedCount,
+      progress_description: description.trim() || null, blockers: blockers.trim() || null,
+    });
+    if (insertError) { setError(insertError.message); setSaving(false); return; }
     setActivity("");
+    setDeviceName("");
     setExpected("");
     setCompleted("");
     setDescription("");
     setBlockers("");
-    setEvidence("");
-    setNotice("Device progress recorded in demo mode. Database submission is not connected.");
+    setNotice("Device progress saved.");
+    await load();
+    setSaving(false);
   }
 
   return (
     <div className="device-module">
-      {notice && (
+      {(notice || error) && (
         <div className="plans-notice">
-          <span>{notice}</span>
-          <button onClick={() => setNotice("")}>×</button>
+          <span role={error ? "alert" : "status"}>{error || notice}</span>
+          <button onClick={() => { setNotice(""); setError(""); }}>×</button>
         </div>
       )}
 
       <div className="device-heading">
         <div>
-          <span className="eyebrow">FUNE LOCAL GOVERNMENT AREA</span>
+          <span className="eyebrow">ASSIGNED LGA</span>
           <h2>Device Progress</h2>
           <p>Track device deployment, installation, and campaign progress.</p>
         </div>
-        <span className="plan-draft-badge">DEMO MODE</span>
+        <span className="live-label">LGA REPORTS</span>
       </div>
 
       <div className="device-summary-grid">
@@ -144,6 +137,11 @@ export default function DeviceProgress() {
                 placeholder="e.g. GTS installation and configuration"
                 required
               />
+            </label>
+
+            <label className="device-field device-field-wide">
+              <span>Device name *</span>
+              <input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} placeholder="Enter device type or name" required />
             </label>
 
             <label className="device-field">
@@ -192,19 +190,11 @@ export default function DeviceProgress() {
               />
             </label>
 
-            <label className="device-field device-field-wide">
-              <span>Evidence reference</span>
-              <input
-                value={evidence}
-                onChange={(event) => setEvidence(event.target.value)}
-                placeholder="Optional photo filename or evidence reference"
-              />
-              <small>This demo accepts a reference only. Actual file uploads will be connected later.</small>
-            </label>
+            <div className="device-field device-field-wide"><span>Evidence upload</span><small>Secure storage is not configured. No file is uploaded or recorded.</small></div>
           </div>
 
-          <button className="primary-button" type="submit">
-            Save progress update →
+          <button className="primary-button" type="submit" disabled={saving || loading || !lgaId}>
+            {saving ? "Saving…" : "Save progress update →"}
           </button>
         </form>
       </section>
@@ -218,7 +208,7 @@ export default function DeviceProgress() {
           <span className="live-label">{records.length} UPDATES</span>
         </div>
 
-        {records.length === 0 ? (
+        {loading ? <div className="plan-empty">Loading device history…</div> : error ? <div className="plan-empty" role="alert">{error}</div> : records.length === 0 ? (
           <div className="plan-empty">
             <div className="working-empty-icon">▦</div>
             <strong>No device updates recorded</strong>
@@ -229,26 +219,26 @@ export default function DeviceProgress() {
             <article className="device-history-row" key={record.id}>
               <div className="device-history-header">
                 <div>
-                  <strong>{record.activity}</strong>
-                  <span>{record.date}</span>
+                  <strong>{record.device_name} · {record.activity_category}</strong>
+                  <span>{new Date(record.reported_at).toLocaleString()}</span>
                 </div>
                 <span className="plan-status plan-status-ongoing">
-                  {Math.round((record.completed / record.expected) * 100)}% achieved
+                  {record.expected_quantity ? Math.round((record.completed_quantity / record.expected_quantity) * 100) : 0}% achieved
                 </span>
               </div>
 
               <div className="device-progress-bar">
-                <span style={{ width: `${(record.completed / record.expected) * 100}%` }} />
+                <span style={{ width: `${record.expected_quantity ? (record.completed_quantity / record.expected_quantity) * 100 : 0}%` }} />
               </div>
 
               <div className="device-history-counts">
-                <span>Expected: <strong>{record.expected}</strong></span>
-                <span>Completed: <strong>{record.completed}</strong></span>
-                <span>Pending: <strong>{record.pending}</strong></span>
+                <span>Expected: <strong>{record.expected_quantity}</strong></span>
+                <span>Completed: <strong>{record.completed_quantity}</strong></span>
+                <span>Pending: <strong>{record.pending_quantity}</strong></span>
               </div>
 
-              {record.description && (
-                <p className="device-history-description">{record.description}</p>
+              {record.progress_description && (
+                <p className="device-history-description">{record.progress_description}</p>
               )}
 
               {record.blockers && (
@@ -258,11 +248,6 @@ export default function DeviceProgress() {
                 </div>
               )}
 
-              {record.evidence && (
-                <div className="device-evidence-reference">
-                  <span>Evidence reference:</span> {record.evidence}
-                </div>
-              )}
             </article>
           ))
         )}
@@ -270,7 +255,7 @@ export default function DeviceProgress() {
 
       <div className="checkin-privacy-note">
         <strong>Progress reporting</strong>
-        <p>Each submission is a dated progress update. Completed counts are reported achievements, not independently verified device installations. Supervisor review and permanent evidence storage will be connected later.</p>
+        <p>Each submission is a dated progress update. Completed counts are reported achievements, not independently verified device installations. No evidence upload is available until secure storage is configured.</p>
       </div>
     </div>
   );

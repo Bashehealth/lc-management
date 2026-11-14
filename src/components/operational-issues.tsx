@@ -221,7 +221,8 @@ export default function OperationalIssues({
   }, [supabase, supervisor]);
 
   useEffect(() => {
-    void loadIssues();
+    const timer = window.setTimeout(() => { void loadIssues(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadIssues]);
 
   async function refreshSelected() {

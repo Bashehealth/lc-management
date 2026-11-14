@@ -28,6 +28,27 @@ type Activity = {
   comments: ActivityComment[];
 };
 
+type TaskRow = {
+  id: string;
+  weekly_plan_id: string;
+  title: string;
+  activity_description: string | null;
+  expected_deliverable: string;
+  planned_date: string | null;
+  status: string;
+  progress_percent: number | null;
+};
+
+type CommentRow = {
+  id: string;
+  task_id: string;
+  author_id: string;
+  author_role: string;
+  body: string;
+  addressed_to_role: string | null;
+  created_at: string;
+};
+
 type Plan = {
   id: string;
   lgaName: string;
@@ -85,8 +106,8 @@ export default function PlansTasksManagement({ userId, role }: Props) {
       const profileMap = new Map((profiles.data ?? []).map(x => [x.id, x.full_name]));
 
       const weeklyIds = (weekly.data ?? []).map(x => x.id);
-      let activityRows: any[] = [];
-      let commentRows: any[] = [];
+      let activityRows: TaskRow[] = [];
+      let commentRows: CommentRow[] = [];
 
       if (weeklyIds.length) {
         const activitiesResult = await supabase
@@ -95,7 +116,7 @@ export default function PlansTasksManagement({ userId, role }: Props) {
           .in("weekly_plan_id", weeklyIds);
 
         if (activitiesResult.error) throw activitiesResult.error;
-        activityRows = activitiesResult.data ?? [];
+        activityRows = (activitiesResult.data ?? []) as TaskRow[];
 
         const taskIds = activityRows.map(x => x.id);
 
@@ -107,7 +128,7 @@ export default function PlansTasksManagement({ userId, role }: Props) {
             .order("created_at", { ascending: true });
 
           if (commentsResult.error) throw commentsResult.error;
-          commentRows = commentsResult.data ?? [];
+          commentRows = (commentsResult.data ?? []) as CommentRow[];
         }
       }
 
@@ -177,7 +198,8 @@ export default function PlansTasksManagement({ userId, role }: Props) {
   }, []);
 
   useEffect(() => {
-    void loadPlans();
+    const timer = window.setTimeout(() => { void loadPlans(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadPlans]);
 
   async function reviewPlan(plan: Plan, decision: "approved" | "returned") {

@@ -72,7 +72,7 @@ export default function WorkingDaysApprovals({ userId }: { userId: string }) {
     setLoading(false);
   }, [month, supabase]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
   const filteredClaims = useMemo(() => claims.filter((claim) => (filter === "All" || claim.status === filter) && (selectedLga === "All" || claim.lga_id === selectedLga)), [claims, filter, selectedLga]);
   const pendingCount = claims.filter((c) => c.status === "claimed").length;

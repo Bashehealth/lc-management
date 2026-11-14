@@ -126,7 +126,8 @@ export default function FeedbackInbox({ userId, role }: Props) {
   }, [userId, role]);
 
   useEffect(() => {
-    void loadFeedback();
+    const timer = window.setTimeout(() => { void loadFeedback(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadFeedback]);
 
   return (

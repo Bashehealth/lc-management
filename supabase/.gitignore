@@ -1,0 +1,9 @@
+# Supabase
+.branches
+.temp
+test-credentials.json
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

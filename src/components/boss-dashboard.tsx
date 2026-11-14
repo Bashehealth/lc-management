@@ -1,179 +1,46 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-const lgaData = [
-  { lga: "Bade", planned: 12, ongoing: 5, reported: 4, verified: 3, overdue: 1, returned: 1 },
-  { lga: "Bursari", planned: 10, ongoing: 4, reported: 3, verified: 2, overdue: 2, returned: 0 },
-  { lga: "Damaturu", planned: 15, ongoing: 7, reported: 5, verified: 4, overdue: 1, returned: 2 },
-  { lga: "Fika", planned: 11, ongoing: 5, reported: 3, verified: 2, overdue: 1, returned: 1 },
-  { lga: "Fune", planned: 13, ongoing: 6, reported: 4, verified: 3, overdue: 2, returned: 1 },
-  { lga: "Geidam", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Gujba", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Jakusko", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Karasuwa", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Machina", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Nangere", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Nguru", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Potiskum", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Tarmuwa", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Yunusari", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-  { lga: "Yusufari", planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 },
-];
+type BossView = "overview" | "comparisons" | "archive";
+type LgaRow = { state_name: string; lga_id: string; lga_name: string; task_total: number; task_completed: number; working_days_approved: number; campaign_checkins: number; readiness_reports: number };
+type ArchiveRow = { report_id: string; state_name: string; lga_name: string | null; report_type: string; period_start: string; period_end: string; status: string; created_at: string; reviewed_at: string | null; content: Record<string, unknown> };
+const titles: Record<BossView, string> = { overview: "Executive Dashboard", comparisons: "LGA Comparisons", archive: "Report Archive" };
 
-const reports = [
-  { title: "Yobe State Monthly Operational Report", period: "October 2026", status: "Approved", approvedBy: "Senior Supervisor", approvedAt: "2026-11-02" },
-  { title: "Campaign Implementation Report", period: "October 2026", status: "Approved", approvedBy: "Senior Supervisor", approvedAt: "2026-11-02" },
-  { title: "Yobe State Monthly Operational Report", period: "November 2026", status: "Pending review", approvedBy: "—", approvedAt: "—" },
-];
+export default function BossDashboard({ view = "overview" }: { view?: BossView }) {
+  const [lgas, setLgas] = useState<LgaRow[]>([]);
+  const [archive, setArchive] = useState<ArchiveRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [sortBy, setSortBy] = useState<"task_completed" | "working_days_approved" | "campaign_checkins">("task_completed");
 
-type Tab = "Overview" | "LGA Performance" | "Reports" | "Operations";
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    const db = createClient();
+    const [comparisonResult, archiveResult] = await Promise.all([
+      db.rpc("boss_lga_comparisons"),
+      db.rpc("boss_report_archive"),
+    ]);
+    const failure = comparisonResult.error ?? archiveResult.error;
+    if (failure) setError(failure.message);
+    else { setLgas((comparisonResult.data ?? []) as LgaRow[]); setArchive((archiveResult.data ?? []) as ArchiveRow[]); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
-export default function BossDashboard() {
-  const [tab, setTab] = useState<Tab>("Overview");
-  const [period, setPeriod] = useState("November 2026");
-  const [lgaFilter, setLgaFilter] = useState("All");
+  const ordered = useMemo(() => [...lgas].sort((a, b) => Number(b[sortBy]) - Number(a[sortBy])), [lgas, sortBy]);
+  const totals = useMemo(() => lgas.reduce((sum, row) => ({ tasks: sum.tasks + Number(row.task_total), completed: sum.completed + Number(row.task_completed), workingDays: sum.workingDays + Number(row.working_days_approved), checkins: sum.checkins + Number(row.campaign_checkins), readiness: sum.readiness + Number(row.readiness_reports) }), { tasks: 0, completed: 0, workingDays: 0, checkins: 0, readiness: 0 }), [lgas]);
+  const contentText = (content: Record<string, unknown>) => [content.achievements, content.challenges, content.recommendations].filter((item) => typeof item === "string" && item.trim()).join(" · ") || "Approved report content not recorded.";
 
-  const totals = useMemo(() => lgaData.reduce((sum, row) => ({
-    planned: sum.planned + row.planned,
-    ongoing: sum.ongoing + row.ongoing,
-    reported: sum.reported + row.reported,
-    verified: sum.verified + row.verified,
-    overdue: sum.overdue + row.overdue,
-    returned: sum.returned + row.returned,
-  }), { planned: 0, ongoing: 0, reported: 0, verified: 0, overdue: 0, returned: 0 }), []);
-
-  const filteredLgas = lgaData.filter((row) => lgaFilter === "All" || row.lga === lgaFilter);
-  const approvedReports = reports.filter((report) => report.status === "Approved").length;
-  const coveredLgas = lgaData.filter((row) => row.planned > 0).length;
-
-  return (
-    <div className="boss-dashboard-module">
-      <header className="boss-dashboard-header">
-        <div>
-          <span className="eyebrow">EXECUTIVE VIEW · YOBE STATE</span>
-          <h1>State Performance Overview</h1>
-          <p>Consolidated programme performance and approved management reports.</p>
-        </div>
-        <span className="live-label">READ ONLY · DEMO DATA</span>
-      </header>
-
-      <section className="boss-dashboard-controls panel">
-        <label>
-          Reporting period
-          <select value={period} onChange={(event) => setPeriod(event.target.value)}>
-            <option>November 2026</option>
-            <option>October 2026</option>
-            <option>September 2026</option>
-          </select>
-        </label>
-        <span>Viewer access only. Changes and approvals are disabled.</span>
-      </section>
-
-      <nav className="boss-dashboard-tabs" aria-label="Executive dashboard sections">
-        {(["Overview", "LGA Performance", "Reports", "Operations"] as Tab[]).map((item) => (
-          <button key={item} type="button" className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
-            {item}
-          </button>
-        ))}
-      </nav>
-
-      {tab === "Overview" && (
-        <>
-          <div className="boss-dashboard-summary">
-            <article className="panel"><span>Official LGAs</span><strong>16</strong><small>Statewide coverage</small></article>
-            <article className="panel"><span>LGAs with sample records</span><strong>{coveredLgas}/16</strong><small>Data coverage</small></article>
-            <article className="panel"><span>Reported completed</span><strong>{totals.reported}</strong><small>Not all verified</small></article>
-            <article className="panel"><span>Supervisor verified</span><strong>{totals.verified}</strong><small>Verified sample records</small></article>
-          </div>
-
-          <section className="panel">
-            <div className="panel-heading"><div><h2>State activity summary</h2><p>Figures are illustrative and incomplete.</p></div></div>
-            <div className="boss-metric-grid">
-              <div><span>Planned</span><strong>{totals.planned}</strong></div>
-              <div><span>Ongoing</span><strong>{totals.ongoing}</strong></div>
-              <div><span>Reported completed</span><strong>{totals.reported}</strong></div>
-              <div><span>Overdue</span><strong>{totals.overdue}</strong></div>
-              <div><span>Returned for revision</span><strong>{totals.returned}</strong></div>
-              <div><span>Verified completed</span><strong>{totals.verified}</strong></div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-heading"><div><h2>Management report status</h2><p>Only approved reports are available for executive review.</p></div></div>
-            <div className="boss-report-list">
-              {reports.filter((report) => report.status === "Approved").map((report) => (
-                <article key={`${report.title}-${report.period}`}>
-                  <div><strong>{report.title}</strong><span>{report.period} · Approved by {report.approvedBy}</span></div>
-                  <span className="status-badge approved">Approved</span>
-                </article>
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-
-      {tab === "LGA Performance" && (
-        <section className="panel">
-          <div className="panel-heading">
-            <div><h2>All 16 LGA performance</h2><p>Zero figures indicate unavailable sample data, not confirmed zero performance.</p></div>
-            <select value={lgaFilter} onChange={(event) => setLgaFilter(event.target.value)}>
-              <option value="All">All LGAs</option>
-              {lgaData.map((row) => <option key={row.lga}>{row.lga}</option>)}
-            </select>
-          </div>
-          <div className="boss-table-wrap">
-            <table className="boss-table">
-              <thead><tr><th>LGA</th><th>Planned</th><th>Ongoing</th><th>Reported</th><th>Verified</th><th>Overdue</th><th>Returned</th></tr></thead>
-              <tbody>
-                {filteredLgas.map((row) => (
-                  <tr key={row.lga}>
-                    <td><strong>{row.lga}</strong></td><td>{row.planned}</td><td>{row.ongoing}</td><td>{row.reported}</td><td>{row.verified}</td><td>{row.overdue}</td><td>{row.returned}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {tab === "Reports" && (
-        <section className="panel">
-          <div className="panel-heading"><div><h2>Approved management reports</h2><p>Read-only list of reports shared with the Boss.</p></div></div>
-          <div className="boss-report-list">
-            {reports.filter((report) => report.status === "Approved").map((report) => (
-              <article key={`${report.title}-${report.period}`}>
-                <div><strong>{report.title}</strong><span>Period: {report.period}</span><span>Approved by: {report.approvedBy}</span><span>Approval date: {report.approvedAt}</span></div>
-                <span className="status-badge approved">Read only</span>
-              </article>
-            ))}
-          </div>
-          <p className="campaign-monitoring-note">PDF and Excel downloads will be enabled after secure report storage and sharing are implemented.</p>
-        </section>
-      )}
-
-      {tab === "Operations" && (
-        <section className="panel">
-          <div className="panel-heading"><div><h2>Operational oversight</h2><p>Sample indicators only; live campaign data is not connected.</p></div></div>
-          <div className="boss-metric-grid">
-            <div><span>Monthly working-day allocation</span><strong>15 days</strong></div>
-            <div><span>Daily check-in deadline</span><strong>10:30 AM</strong></div>
-            <div><span>Readiness reporting</span><strong>Twice daily</strong></div>
-            <div><span>Campaign reporting LGAs</span><strong>16</strong></div>
-          </div>
-          <div className="plans-notice">
-            Working-day claims, movement requests, morning/evening readiness, device installation and supportive-supervision records will appear here once their live data sources are connected.
-          </div>
-        </section>
-      )}
-
-      <footer className="boss-dashboard-footer">
-        <strong>Executive access is read-only.</strong>
-        <span>No editing, approvals, assignments or movement decisions are available in this workspace.</span>
-      </footer>
-      <div className="plans-notice">
-        <strong>Prototype boundary:</strong> All figures and report records are illustrative. The dashboard is not yet connected to approved database records, and it must not be used as an official management report.
-      </div>
-    </div>
-  );
+  return <div className="boss-dashboard-module">
+    <header className="boss-dashboard-header"><div><span className="eyebrow">EXECUTIVE VIEW · ALL AUTHORIZED STATES</span><h1>{titles[view]}</h1><p>Aggregated operational counts and approved report records.</p></div><span className="live-label">READ ONLY</span></header>
+    <div className="panel-heading"><span>Reports from restricted reporting functions; no direct operational-table access.</span><button type="button" className="secondary-button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button></div>
+    {error && <section className="panel" role="alert"><h2>Executive reporting is unavailable</h2><p>{error}</p><p>Confirm the reviewed reporting contract is installed in the isolated database and that this account has the Boss role.</p></section>}
+    {loading ? <section className="panel plan-empty">Loading secure reporting results…</section> : !error && (view === "overview" ? <>
+      <div className="boss-dashboard-summary"><article className="panel"><span>LGAs represented</span><strong>{lgas.length}</strong></article><article className="panel"><span>Tasks completed</span><strong>{totals.completed} / {totals.tasks}</strong></article><article className="panel"><span>Approved working days</span><strong>{totals.workingDays}</strong></article><article className="panel"><span>Campaign records</span><strong>{totals.checkins + totals.readiness}</strong></article></div>
+      <section className="panel"><div className="panel-heading"><div><h2>State coverage</h2><p>Counts are derived from operational database rows.</p></div></div>{lgas.length === 0 ? <div className="plan-empty">No aggregate rows were returned.</div> : <div className="boss-report-list">{Object.entries(lgas.reduce<Record<string, number>>((acc, item) => { acc[item.state_name] = (acc[item.state_name] ?? 0) + 1; return acc; }, {})).map(([state, count]) => <article key={state}><strong>{state}</strong><span>{count} LGAs represented</span></article>)}</div>}</section>
+    </> : view === "comparisons" ? <section className="panel"><div className="panel-heading"><div><h2>LGA operational comparisons</h2><p>Counts only; no individual operational or personal records are exposed.</p></div><label>Sort by <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}><option value="task_completed">Tasks completed</option><option value="working_days_approved">Approved working days</option><option value="campaign_checkins">Campaign check-ins</option></select></label></div>{lgas.length === 0 ? <div className="plan-empty">No comparison rows were returned.</div> : <div className="campaign-monitoring-table-wrap"><table className="campaign-monitoring-table"><thead><tr><th>State</th><th>LGA</th><th>Tasks complete / total</th><th>Approved working days</th><th>Check-ins</th><th>Readiness reports</th></tr></thead><tbody>{ordered.map((row) => <tr key={row.lga_id}><td>{row.state_name}</td><td><strong>{row.lga_name}</strong></td><td>{row.task_completed} / {row.task_total}</td><td>{row.working_days_approved}</td><td>{row.campaign_checkins}</td><td>{row.readiness_reports}</td></tr>)}</tbody></table></div>}</section> : <section className="panel"><div className="panel-heading"><div><h2>Approved report archive</h2><p>Only reports with an approved status are returned.</p></div></div>{archive.length === 0 ? <div className="plan-empty">No approved reports are available.</div> : <div className="boss-report-list">{archive.map((report) => <article key={report.report_id}><div><strong>{report.state_name}{report.lga_name ? ` · ${report.lga_name}` : ""} — {report.report_type.replaceAll("_", " ")}</strong><span>Period: {report.period_start} to {report.period_end}</span><span>Reviewed: {report.reviewed_at ? new Date(report.reviewed_at).toLocaleString() : "—"}</span><p>{contentText(report.content ?? {})}</p></div><span className="status-badge approved">{report.status}</span></article>)}</div>}</section>)}
+    <div className="plans-notice"><strong>Access boundary:</strong> This view uses Boss-only reporting RPCs. It does not grant direct access to reports, tasks, working-day records or campaign tables. Results are unavailable until those functions are installed and verified in the isolated test environment.</div>
+  </div>;
 }
