@@ -28,6 +28,10 @@ try {
   supabase db query --local --file $stateDirectoryProposalPath
   if ($LASTEXITCODE -ne 0) { throw 'Applying the programme state directory proposal to the disposable local database failed.' }
 
+  $bossDirectoryProposalPath = Join-Path $repoRoot 'supabase\proposals\20261122_boss_directory_data.sql'
+  supabase db query --local --file $bossDirectoryProposalPath
+  if ($LASTEXITCODE -ne 0) { throw 'Applying the Boss directory data proposal to the disposable local database failed.' }
+
   $issueFixturePath = Join-Path $repoRoot 'supabase\tests\fixtures\operational_issues_remote_shape.sql'
   supabase db query --local --file $issueFixturePath
   if ($LASTEXITCODE -ne 0) { throw 'Creating the local-only Operational Issues schema fixture failed.' }
@@ -56,7 +60,11 @@ try {
   supabase db query --local --file $timesheetProposalPath
   if ($LASTEXITCODE -ne 0) { throw 'Applying the monthly timesheet proposal to the disposable local database failed.' }
 
-  supabase test db supabase/tests/20261115_security_foundation.pgtap.sql supabase/tests/20261116_reporting_evidence.pgtap.sql supabase/tests/20261118_operational_issues_scope.pgtap.sql supabase/tests/20261121_monthly_lc_timesheets.pgtap.sql --local
+  $bossReportingProposalPath = Join-Path $repoRoot 'supabase\proposals\20261123_boss_programme_executive_reporting.sql'
+  supabase db query --local --file $bossReportingProposalPath
+  if ($LASTEXITCODE -ne 0) { throw 'Applying the Boss executive reporting proposal to the disposable local database failed.' }
+
+  supabase test db supabase/tests/20261115_security_foundation.pgtap.sql supabase/tests/20261116_reporting_evidence.pgtap.sql supabase/tests/20261118_operational_issues_scope.pgtap.sql supabase/tests/20261121_monthly_lc_timesheets.pgtap.sql supabase/tests/20261123_boss_programme_executive_reporting.pgtap.sql --local
   if ($LASTEXITCODE -ne 0) { throw 'The targeted pgTAP suite failed.' }
 }
 finally {

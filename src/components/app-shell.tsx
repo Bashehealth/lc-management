@@ -92,6 +92,9 @@ const navigation: Record<Role, { label: string; icon: string }[]> = {
   ],
   boss: [
     { label: "Executive Dashboard", icon: ">" },
+    { label: "Personnel Directory", icon: ">" },
+    { label: "State Drilldown", icon: ">" },
+    { label: "Working Days Monitor", icon: ">" },
     { label: "LGA Comparisons", icon: ">" },
     { label: "Report Archive", icon: ">" },
     { label: "Timesheet Approvals", icon: ">" },
@@ -367,9 +370,9 @@ export default function AppShell() {
 
         <div className="workspace-label">WORKSPACE</div>
         <div className="workspace-card">
-          <div className="workspace-icon">Y</div>
+          <div className="workspace-icon">{user.role === "boss" ? "15" : "Y"}</div>
           <div>
-            <strong>Yobe State</strong>
+            <strong>{user.role === "boss" ? "Programme Overview" : "Yobe State"}</strong>
             <span>Health Operations</span>
           </div>
           <span className="workspace-arrow"> - </span>
@@ -459,9 +462,11 @@ export default function AppShell() {
         <div className="page-content">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">YOBE STATE  -  HEALTH OPERATIONS</div>
+              <div className="eyebrow">{user.role === "boss" ? "PROGRAMME-WIDE HEALTH OPERATIONS" : "YOBE STATE  -  HEALTH OPERATIONS"}</div>
               <h1>
-                {active === "Dashboard"
+                {user.role === "boss" && active === "Executive Dashboard"
+                  ? "Programme-Wide Health Operations"
+                  : active === "Dashboard"
                   ? `Good day, ${user.name.split(" ")[0]}`
                   : active}
               </h1>
@@ -526,6 +531,12 @@ export default function AppShell() {
             <BossDashboard view="comparisons" />
           ) : active === "Report Archive" && user.role === "boss" ? (
             <BossDashboard view="archive" />
+          ) : active === "Personnel Directory" && user.role === "boss" ? (
+            <BossDashboard view="personnel" />
+          ) : active === "State Drilldown" && user.role === "boss" ? (
+            <BossDashboard view="state" />
+          ) : active === "Working Days Monitor" && user.role === "boss" ? (
+            <BossDashboard view="working-days" />
           ) : active === "Reports" && user.role === "boss" ? (
             <BossDashboard />
           ) : (active === "Operational Issues" && (user.role === "state_coordinator" || user.role === "senior_supervisor")) ||
@@ -612,8 +623,8 @@ export default function AppShell() {
           )}
 
           <footer className="app-footer">
-            <span>eHealth LC Manager  -  Yobe State</span>
-            <span>Yobe State Health Operations</span>
+            <span>{user.role === "boss" ? "eHealth LC Manager · Programme-wide" : "eHealth LC Manager  -  Yobe State"}</span>
+            <span>{user.role === "boss" ? "Programme-wide Health Operations" : "Yobe State Health Operations"}</span>
           </footer>
         </div>
       </main>

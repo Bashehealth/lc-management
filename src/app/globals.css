@@ -4627,6 +4627,349 @@ button { cursor: pointer; }
   }
 }
 
+.boss-executive-toolbar,
+.boss-directory-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #dcebf4;
+  border-radius: 12px;
+  background: #f7fbfe;
+}
+
+.boss-executive-toolbar label,
+.boss-directory-filters label {
+  display: grid;
+  gap: 6px;
+  color: var(--navy, #075985);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.boss-executive-toolbar input,
+.boss-directory-filters input,
+.boss-directory-filters select {
+  min-width: 175px;
+  padding: 10px 11px;
+  border: 1px solid #d3e0e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #213547;
+  font: inherit;
+}
+
+.boss-executive-toolbar > span {
+  margin-right: auto;
+  padding-bottom: 8px;
+  color: var(--muted, #64748b);
+  font-size: 13px;
+}
+
+.boss-executive-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.boss-executive-metrics .panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px;
+  border-color: #e1edf4;
+  background: linear-gradient(145deg, #fff 55%, #f3faff);
+}
+
+.boss-executive-metrics span {
+  color: #526779;
+  font-size: 12px;
+}
+
+.boss-executive-metrics strong {
+  color: #0b486b;
+  font-size: clamp(22px, 3vw, 30px);
+  overflow-wrap: anywhere;
+}
+
+.boss-executive-metrics small,
+.boss-section .panel-heading p {
+  color: var(--muted, #64748b);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.boss-section {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+  padding: 20px;
+}
+
+.boss-section h3,
+.boss-section h4 {
+  margin: 0;
+  color: #123b56;
+}
+
+.boss-state-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.boss-state-card {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dce9f1;
+  border-radius: 10px;
+  background: #fff;
+  color: #173b52;
+  text-align: left;
+}
+
+button.boss-state-card {
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+button.boss-state-card:hover:not(:disabled),
+button.boss-state-card:focus-visible {
+  border-color: #58a5ce;
+  background: #f4faff;
+  transform: translateY(-1px);
+}
+
+.boss-state-card:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.boss-state-card > span {
+  color: #327a9f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .65px;
+}
+
+.boss-state-card strong {
+  font-size: 14px;
+}
+
+.boss-state-card small {
+  color: #627587;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.boss-state-summary {
+  background: #f9fcfe;
+}
+
+.boss-loading {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.boss-loading span {
+  height: 86px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #edf4f8, #f8fbfd, #edf4f8);
+  background-size: 200% 100%;
+  animation: boss-loading-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes boss-loading-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.boss-error {
+  border-color: #f1caca;
+  background: #fffafa;
+}
+
+.boss-error h3 {
+  margin: 0 0 8px;
+  color: #9b2c2c;
+}
+
+.boss-error p,
+.boss-empty,
+.boss-boundary-note {
+  color: #5d7080;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.boss-empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 9px;
+  background: #f7fafc;
+}
+
+.boss-boundary-note {
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid #dceaf3;
+  border-radius: 9px;
+  background: #f4faff;
+}
+
+.boss-state-supervisors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.boss-state-supervisors article,
+.boss-selected-lga {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid #e0eaf0;
+  border-radius: 10px;
+  background: #fbfdfe;
+}
+
+.boss-state-supervisors article > p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.boss-state-supervisors article > p span {
+  color: #65798a;
+  font-size: 11px;
+}
+
+.boss-selected-lga h4 {
+  margin: 3px 0;
+  font-size: 18px;
+}
+
+.boss-selected-lga > div > p {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.boss-lc-list {
+  display: grid;
+  gap: 8px;
+}
+
+.boss-lc-list button {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #dce8ef;
+  border-radius: 8px;
+  background: white;
+  color: #173b52;
+  text-align: left;
+}
+
+.boss-lc-list button.selected {
+  border-color: #3289b6;
+  background: #eef8fd;
+}
+
+.boss-lc-list button span {
+  color: #617587;
+  font-size: 11px;
+}
+
+.boss-lc-detail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.boss-lc-detail div {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f8fb;
+}
+
+.boss-lc-detail dt {
+  color: #627587;
+  font-size: 11px;
+}
+
+.boss-lc-detail dd {
+  margin: 5px 0 0;
+  color: #183d54;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.boss-back-link {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: #126a94;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boss-quick-table {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .boss-executive-metrics,
+  .boss-state-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .boss-directory-filters label {
+    flex: 1 1 200px;
+  }
+}
+
+@media (max-width: 560px) {
+  .boss-section {
+    padding: 14px;
+  }
+
+  .boss-executive-toolbar,
+  .boss-executive-toolbar label,
+  .boss-executive-toolbar input,
+  .boss-executive-toolbar button,
+  .boss-directory-filters label,
+  .boss-directory-filters input,
+  .boss-directory-filters select {
+    width: 100%;
+  }
+
+  .boss-executive-toolbar > span {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .boss-executive-metrics,
+  .boss-state-cards,
+  .boss-state-supervisors,
+  .boss-lc-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .boss-state-card {
+    padding: 12px;
+  }
+}
+
 
 /* =========================================================
    eHEALTH AFRICA — GLOBAL DESIGN SYSTEM
