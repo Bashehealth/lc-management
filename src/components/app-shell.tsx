@@ -215,6 +215,7 @@ function Login() {
             Access is restricted to authorized Yobe State health operations
             personnel. Contact your system administrator if you need an account.
           </p>
+          <p className="login-credit">Developed by Bashir Abubakar</p>
         </div>
       </section>
     </main>
@@ -248,11 +249,13 @@ export default function AppShell() {
         .from("profiles")
         .select("full_name, role, lga_id")
         .eq("id", authUser.id)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profile) {
         if (mounted) {
-          setAuthError(`Profile lookup failed [${profileError?.code ?? "NO_DATA"}]: ${profileError?.message ?? "Profile not found"}. Auth ID: ${authUser.id}`);
+          setAuthError(profileError
+            ? `We could not verify your eHealth profile (${profileError.code}). Contact the system administrator.`
+            : "Authentication succeeded, but this account is not linked to an eHealth profile. Ask the system administrator to link your existing account to the correct role.");
           setAuthLoading(false);
         }
         return;

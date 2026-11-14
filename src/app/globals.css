@@ -142,6 +142,7 @@ button { cursor: pointer; }
 .full-button { width: 100%; display: flex; justify-content: space-between; }
 .login-disclaimer { text-align: center; color: #87939d; font-size: 10px; line-height: 1.6; margin-top: 22px; }
 .mobile-brand { display: none; margin-bottom: 30px; }
+.login-credit { margin: 22px 0 0; color: var(--muted); text-align: center; font-size: 11px; }
 
 .app-layout { min-height: 100vh; display: flex; }
 
@@ -349,6 +350,7 @@ button { cursor: pointer; }
   .login-panel { min-height: 100vh; padding: 25px; }
   .mobile-brand { display: flex; }
   .mobile-brand strong { color: var(--navy); font-size: 14px; }
+  .mobile-brand .brand-logo { width: 68px; height: 54px; }
 
   .sidebar {
     position: fixed;
@@ -6204,5 +6206,96 @@ textarea {
   .dpm-request-details div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+}
+
+.dpm-state-grid,
+.dpm-lga-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.dpm-state-card,
+.dpm-lga-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  text-align: left;
+  color: var(--text, #263746);
+  background: #fff;
+  border: 1px solid var(--border, #e8edf0);
+  border-radius: 10px;
+}
+
+.dpm-state-card:hover,
+.dpm-lga-card:hover {
+  border-color: var(--eh-primary, #0284c7);
+  background: var(--eh-primary-light, #f0f9ff);
+}
+
+.dpm-state-card > span,
+.dpm-selected-state > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dpm-state-card > strong,
+.dpm-lga-card > strong,
+.dpm-selected-state > strong {
+  font-size: 16px;
+}
+
+.dpm-state-card > small,
+.dpm-lga-card > span,
+.dpm-lga-card > small,
+.dpm-selected-state > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dpm-selected-state {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--eh-primary-light, #f0f9ff);
+}
+
+.dpm-boundary-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: #475569;
+  background: #f1f5f9;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dpm-drilldown-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dpm-drilldown-actions h4 {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .dpm-state-grid,
+  .dpm-lga-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dpm-state-card,
+  .dpm-lga-card {
+    min-height: 70px;
   }
 }
