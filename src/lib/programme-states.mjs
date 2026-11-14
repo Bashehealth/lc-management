@@ -1,0 +1,17 @@
+export const programmeStates = Object.freeze([
+  { code: "NG-YO", name: "Yobe State" },
+  { code: "NG-BO", name: "Borno State" },
+  { code: "NG-BA", name: "Bauchi State" },
+  { code: "NG-GO", name: "Gombe State" },
+  { code: "NG-AD", name: "Adamawa State" },
+  { code: "NG-JI", name: "Jigawa State" },
+  { code: "NG-KN", name: "Kano State" },
+  { code: "NG-KD", name: "Kaduna State" },
+  { code: "NG-KT", name: "Katsina State" },
+  { code: "NG-ZA", name: "Zamfara State" },
+  { code: "NG-SO", name: "Sokoto State" },
+  { code: "NG-KE", name: "Kebbi State" },
+  { code: "NG-NI", name: "Niger State" },
+  { code: "NG-NA", name: "Nasarawa State" },
+  { code: "NG-KO", name: "Kogi State" },
+]);

@@ -2,7 +2,14 @@
 -- `supabase db reset` against the isolated project is the supported setup path.
 
 INSERT INTO public.states (code, name, country_code) VALUES
-  ('NG-YO', 'Yobe', 'NG'), ('NG-KN', 'Kano Test State', 'NG')
+  ('NG-YO', 'Yobe State', 'NG'), ('NG-BO', 'Borno State', 'NG'),
+  ('NG-BA', 'Bauchi State', 'NG'), ('NG-GO', 'Gombe State', 'NG'),
+  ('NG-AD', 'Adamawa State', 'NG'), ('NG-JI', 'Jigawa State', 'NG'),
+  ('NG-KN', 'Kano State', 'NG'), ('NG-KD', 'Kaduna State', 'NG'),
+  ('NG-KT', 'Katsina State', 'NG'), ('NG-ZA', 'Zamfara State', 'NG'),
+  ('NG-SO', 'Sokoto State', 'NG'), ('NG-KE', 'Kebbi State', 'NG'),
+  ('NG-NI', 'Niger State', 'NG'), ('NG-NA', 'Nasarawa State', 'NG'),
+  ('NG-KO', 'Kogi State', 'NG')
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO public.lgas (id, code, name, coordinator_reference_name, state_id) VALUES

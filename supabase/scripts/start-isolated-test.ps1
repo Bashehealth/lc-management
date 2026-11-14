@@ -24,6 +24,10 @@ try {
   supabase db reset --local
   if ($LASTEXITCODE -ne 0) { throw 'Local database reset failed.' }
 
+  $stateDirectoryProposalPath = Join-Path $repoRoot 'supabase\proposals\20261120_programme_state_directory.sql'
+  supabase db query --local --file $stateDirectoryProposalPath
+  if ($LASTEXITCODE -ne 0) { throw 'Applying the programme state directory proposal to the disposable local database failed.' }
+
   $issueFixturePath = Join-Path $repoRoot 'supabase\tests\fixtures\operational_issues_remote_shape.sql'
   supabase db query --local --file $issueFixturePath
   if ($LASTEXITCODE -ne 0) { throw 'Creating the local-only Operational Issues schema fixture failed.' }
@@ -44,7 +48,15 @@ try {
   supabase db query --local --file $issuesProposalPath
   if ($LASTEXITCODE -ne 0) { throw 'Applying the Operational Issues review proposal to the disposable local database failed.' }
 
-  supabase test db supabase/tests/20261115_security_foundation.pgtap.sql supabase/tests/20261116_reporting_evidence.pgtap.sql supabase/tests/20261118_operational_issues_scope.pgtap.sql --local
+  $dpmOverviewProposalPath = Join-Path $repoRoot 'supabase\proposals\20261119_dpm_state_overview.sql'
+  supabase db query --local --file $dpmOverviewProposalPath
+  if ($LASTEXITCODE -ne 0) { throw 'Applying the DPM state overview proposal to the disposable local database failed.' }
+
+  $timesheetProposalPath = Join-Path $repoRoot 'supabase\proposals\20261121_monthly_lc_timesheets.sql'
+  supabase db query --local --file $timesheetProposalPath
+  if ($LASTEXITCODE -ne 0) { throw 'Applying the monthly timesheet proposal to the disposable local database failed.' }
+
+  supabase test db supabase/tests/20261115_security_foundation.pgtap.sql supabase/tests/20261116_reporting_evidence.pgtap.sql supabase/tests/20261118_operational_issues_scope.pgtap.sql supabase/tests/20261121_monthly_lc_timesheets.pgtap.sql --local
   if ($LASTEXITCODE -ne 0) { throw 'The targeted pgTAP suite failed.' }
 }
 finally {

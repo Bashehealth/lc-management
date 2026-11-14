@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { programmeStates } from "@/lib/programme-states.mjs";
 
 type Row = Record<string, unknown>;
-type StateRow = { id: string; code: string; name: string; state_coordinators?: string[]; lga_count?: number; plan_count?: number; completed_task_count?: number; pending_review_count?: number; submitted_lga_report_count?: number; working_day_record_count?: number; leave_request_count?: number };
+type StateRow = { id: string | null; code: string; name: string; configured: boolean; state_coordinators?: string[]; lga_count?: number; plan_count?: number; completed_task_count?: number; pending_review_count?: number; submitted_lga_report_count?: number; working_day_record_count?: number; leave_request_count?: number };
 type LgaRow = { id: string; lga_id?: string; state_id: string; name: string; coordinator_reference_name?: string | null; lga_coordinators?: string[]; plan_count?: number; completed_task_count?: number; pending_review_count?: number; submitted_lga_report_count?: number; working_day_record_count?: number; leave_request_count?: number };
 type Decision = "approved" | "rejected";
 type Section = "DPM Dashboard" | "Working Days Monitor" | "Leave Requests";
@@ -76,12 +77,18 @@ export default function DpmWorkspace({ section }: { section: Section }) {
     if (failures.length) {
       setError(failures.map((failure) => failure?.message).join(" · "));
     } else {
-      const loadedStates = (stateResult.data ?? []) as StateRow[];
+      const loadedStates = (stateResult.data ?? []) as (Omit<StateRow, "configured"> & { configured?: boolean })[];
       const loadedLgas = (lgaResult.data ?? []) as LgaRow[];
       const summaries = (summaryResult.data ?? []) as (StateRow & { state_id: string; state_code: string; state_name: string })[];
-      const statesWithSummary = loadedStates.map((state) => {
-        const summary = summaries.find((item) => item.state_id === state.id);
-        return summary ? { ...state, ...summary, id: state.id, code: state.code, name: state.name } : state;
+      const statesWithSummary = programmeStates.map((entry) => {
+        const state = loadedStates.find((item) => item.code === entry.code);
+        const summary = state && summaries.find((item) => item.state_id === state.id);
+        return {
+          ...entry,
+          id: state?.id ?? null,
+          configured: Boolean(state),
+          ...(summary ? { ...summary, id: state?.id ?? null, code: entry.code, name: entry.name, configured: true } : {}),
+        } as StateRow;
       });
       setDays((dayResult.data ?? []) as Row[]);
       setRequests((requestResult.data ?? []) as Row[]);
@@ -90,7 +97,7 @@ export default function DpmWorkspace({ section }: { section: Section }) {
       setLgas(loadedLgas);
       setSummaryUnavailable(Boolean(summaryResult.error));
 
-      const counts = summaryResult.error ? await Promise.all(loadedStates.map(async (state) => {
+      const counts = summaryResult.error ? await Promise.all(loadedStates.filter((state): state is typeof state & { id: string } => Boolean(state.id)).map(async (state) => {
         const stateLgaIds = loadedLgas.filter((lga) => lga.state_id === state.id).map((lga) => lga.id);
         if (!stateLgaIds.length) return [state.id, 0] as const;
         const { count, error: countError } = await supabase.from("working_day_records")
@@ -105,7 +112,7 @@ export default function DpmWorkspace({ section }: { section: Section }) {
   useEffect(() => { const timer = window.setTimeout(() => { void loadData(); }, 0); return () => window.clearTimeout(timer); }, [loadData]);
 
   useEffect(() => {
-    if (!selectedState) {
+    if (!selectedState?.id) {
       return;
     }
     let mounted = true;
@@ -148,9 +155,10 @@ export default function DpmWorkspace({ section }: { section: Section }) {
     return summary ? { ...lga, ...summary, id: lga.id, state_id: lga.state_id, name: lga.name } : lga;
   });
   const stateTotal = (field: keyof StateRow) => states.reduce((sum, state) => sum + (typeof state[field] === "number" ? state[field] as number : 0), 0);
-  const fallbackWorkingDayTotal = states.every((state) => workingDayCounts[state.id] !== undefined)
+  const configuredStates = states.filter((state) => state.configured);
+  const fallbackWorkingDayTotal = configuredStates.length > 0 && configuredStates.every((state) => state.id && workingDayCounts[state.id] !== undefined)
     ? Object.values(workingDayCounts).reduce((sum, count) => sum + count, 0)
-    : null;
+    : configuredStates.length === 0 ? 0 : null;
 
   return (
     <section className="dpm-workspace">
@@ -167,7 +175,7 @@ export default function DpmWorkspace({ section }: { section: Section }) {
       {loading ? <div className="plan-empty"><strong>Loading DPM workspace…</strong></div> : <>
         {section === "DPM Dashboard" && <>
           <div className="dpm-metrics">
-            <article className="plan-summary-card"><span>Configured states</span><strong>{states.length}</strong></article>
+            <article className="plan-summary-card"><span>Programme states</span><strong>{states.length}</strong><small>{configuredStates.length} configured in database</small></article>
             <article className="plan-summary-card"><span>Working-day records</span><strong>{summaryUnavailable ? fallbackWorkingDayTotal ?? "—" : stateTotal("working_day_record_count")}</strong>
               {summaryUnavailable && <small>Exact total from permitted records</small>}</article>
             <article className="plan-summary-card"><span>Plans</span><strong>{summaryUnavailable ? "—" : stateTotal("plan_count")}</strong>
@@ -182,16 +190,22 @@ export default function DpmWorkspace({ section }: { section: Section }) {
             <div className="panel-heading"><div><h3>All-state overview</h3><p>State list and working-day totals come from authorized database records.</p></div>
               {selectedState && <button type="button" className="secondary-button" onClick={() => { setSelectedState(null); setSelectedLga(null); }}>Back to all states</button>}</div>
             {!states.length ? <p className="dpm-empty">No active states are configured in the database.</p> : <>
-              {!selectedState ? <div className="dpm-state-grid">{states.map((state) => <button type="button" className="dpm-state-card" key={state.id}
+              {!selectedState ? <div className="dpm-state-grid">{states.map((state) => <button type="button" className="dpm-state-card" key={state.code}
                 onClick={() => { setSelectedState(state); setSelectedLga(null); }}>
-                <span>{state.code}</span><strong>{state.name}</strong><small>{lgas.filter((lga) => lga.state_id === state.id).length} configured LGAs · {state.working_day_record_count ?? workingDayCounts[state.id] ?? "—"} working-day records</small>
+                <span>{state.configured ? "Configured" : "Directory entry · setup required"}</span><strong>{state.name}</strong><small>{state.configured ? `${lgas.filter((lga) => lga.state_id === state.id).length} configured LGAs · ${state.working_day_record_count ?? (state.id ? workingDayCounts[state.id] : undefined) ?? "—"} working-day records` : "No state database record or operational figures yet."}</small>
               </button>)}</div> : <>
-                <div className="dpm-selected-state"><span>Selected state</span><strong>{selectedState.name}</strong><small>{lgas.filter((lga) => lga.state_id === selectedState.id).length} configured LGAs · {selectedState.working_day_record_count ?? workingDayCounts[selectedState.id] ?? "—"} working-day records</small></div>
-                {!summaryUnavailable && <div className="dpm-snapshot"><div><strong>{selectedState.state_coordinators?.join(", ") || "No coordinator profile"}</strong><span>State Coordinator</span></div>
+                <div className="dpm-selected-state"><span>{selectedState.configured ? "Selected state" : "Not yet configured in database"}</span><strong>{selectedState.name}</strong><small>{selectedState.configured ? `${lgas.filter((lga) => lga.state_id === selectedState.id).length} configured LGAs · ${selectedState.working_day_record_count ?? (selectedState.id ? workingDayCounts[selectedState.id] : undefined) ?? "—"} working-day records` : "This programme state is selectable, but its database record and operational assignments are not yet configured."}</small></div>
+                {selectedState.configured && !summaryUnavailable && <div className="dpm-snapshot"><div><strong>{selectedState.state_coordinators?.join(", ") || "No coordinator profile"}</strong><span>State Coordinator</span></div>
                   <div><strong>{selectedState.plan_count ?? 0}</strong><span>Plans</span></div><div><strong>{selectedState.completed_task_count ?? 0}</strong><span>Completed tasks</span></div>
                   <div><strong>{selectedState.pending_review_count ?? 0}</strong><span>Pending reviews</span></div><div><strong>{selectedState.submitted_lga_report_count ?? 0}</strong><span>Submitted LGA reports</span></div>
                   <div><strong>{selectedState.leave_request_count ?? 0}</strong><span>Leave requests</span></div></div>}
-                {!selectedLga ? <>
+                {selectedState.configured ? selectedLga ? <>
+                  <div className="dpm-drilldown-actions"><button type="button" className="secondary-button" onClick={() => setSelectedLga(null)}>Back to {selectedState.name} LGAs</button>
+                    <h4>{selectedLga.name} · LGA operations</h4></div>
+                  <div className="panel-heading"><div><h3>Working-day records</h3><p>Read-only · newest 200 records visible for this LGA.</p></div></div>
+                  <RecordsTable rows={days.filter((day) => day.lga_id === selectedLga.id)} columns={workingDayColumns.filter(([key]) => key !== "lga_id")} />
+                  {(summaryUnavailable || lgaSummaryUnavailable) && <p className="dpm-boundary-note">Plan, task, report, leave-by-LGA and staff-profile summaries require an authorized DPM reporting contract that is not currently available in this database.</p>}
+                </> : <>
                   {summaryUnavailable && <p className="dpm-boundary-note">State Coordinator names and operational totals are restricted by the current database policy. Apply the reviewed DPM reporting contract before these details can be shown.</p>}
                   <div className="dpm-lga-grid">{selectedStateLgas.map((lga) => <button type="button" className="dpm-lga-card" key={lga.id}
                     onClick={() => setSelectedLga(lga)}>
@@ -199,13 +213,7 @@ export default function DpmWorkspace({ section }: { section: Section }) {
                     {!summaryUnavailable && !lgaSummaryUnavailable && <small>LC: {lga.lga_coordinators?.join(", ") || "No coordinator profile"} · {lga.completed_task_count ?? 0} completed tasks</small>}
                     {lga.coordinator_reference_name && <small>Coordinator reference: {lga.coordinator_reference_name}</small>}
                   </button>)}</div>
-                </> : <>
-                  <div className="dpm-drilldown-actions"><button type="button" className="secondary-button" onClick={() => setSelectedLga(null)}>Back to {selectedState.name} LGAs</button>
-                    <h4>{selectedLga.name} · LGA operations</h4></div>
-                  <div className="panel-heading"><div><h3>Working-day records</h3><p>Read-only · newest 200 records visible for this LGA.</p></div></div>
-                  <RecordsTable rows={days.filter((day) => day.lga_id === selectedLga.id)} columns={workingDayColumns.filter(([key]) => key !== "lga_id")} />
-                  {(summaryUnavailable || lgaSummaryUnavailable) && <p className="dpm-boundary-note">Plan, task, report, leave-by-LGA and staff-profile summaries require an authorized DPM reporting contract that is not currently available in this database.</p>}
-                </>}
+                </> : <p className="dpm-boundary-note">No operational records, LGA assignments or coordinator profiles are available for this state yet.</p>}
               </>}
             </>}
           </article>

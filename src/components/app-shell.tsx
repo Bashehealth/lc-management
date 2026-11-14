@@ -24,6 +24,7 @@ import StateCoordinatorDashboard from "./state-coordinator-dashboard";
 import OperationalIssues from "./operational-issues";
 import DashboardOverview from "./dashboard-overview";
 import DpmWorkspace from "./dpm-workspace";
+import MonthlyTimesheets from "./monthly-timesheets";
 
 type Role =
   | "lga_coordinator"
@@ -93,11 +94,13 @@ const navigation: Record<Role, { label: string; icon: string }[]> = {
     { label: "Executive Dashboard", icon: ">" },
     { label: "LGA Comparisons", icon: ">" },
     { label: "Report Archive", icon: ">" },
+    { label: "Timesheet Approvals", icon: ">" },
   ],
   dpm: [
     { label: "DPM Dashboard", icon: "▦" },
     { label: "Working Days Monitor", icon: "▤" },
     { label: "Leave Requests", icon: "☷" },
+    { label: "Monthly Timesheet", icon: "▤" },
   ],
 };
 
@@ -470,7 +473,11 @@ export default function AppShell() {
             <div className="date-label">{new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</div>
           </div>
 
-          {user.role === "dpm" && ["DPM Dashboard", "Working Days Monitor", "Leave Requests"].includes(active) ? (
+          {user.role === "dpm" && active === "Monthly Timesheet" ? (
+            <MonthlyTimesheets view="dpm" />
+          ) : user.role === "boss" && active === "Timesheet Approvals" ? (
+            <MonthlyTimesheets view="boss" />
+          ) : user.role === "dpm" && ["DPM Dashboard", "Working Days Monitor", "Leave Requests"].includes(active) ? (
             <DpmWorkspace section={active as "DPM Dashboard" | "Working Days Monitor" | "Leave Requests"} />
           ) : active === "Notifications" && ["lga_coordinator", "state_coordinator", "senior_supervisor"].includes(user.role) ? (
             <FeedbackInbox userId={user.id} role={user.role as "lga_coordinator" | "state_coordinator" | "senior_supervisor"} />
