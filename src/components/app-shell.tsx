@@ -139,20 +139,17 @@ function Login() {
         <div className="brand-lockup">
           <div className="brand-logo"><img src="/images/ehealth-africa-logo.png" alt="eHealth Africa" /></div>
           <div>
-            <strong>eHealth LC Manager</strong>
-            <span>Yobe State - Health Operations</span>
+            <strong>LCs Management System</strong>
+            <span>Health Operations</span>
           </div>
         </div>
 
         <div className="login-message">
-          <span className="eyebrow">HEALTH OPERATIONS PLATFORM</span>
-          <h1>Better coordination.<br />Stronger accountability.</h1>
           <p>
-            A centralized platform for planning, monitoring and reporting
-            local government health operations across Yobe State.
+            A centralized platform for planning, monitoring and reporting local government health operations across 15 programme states.
           </p>
           <div className="login-trust">
-            <span>16 LGAs</span>
+            <span>15 States</span>
             <span> - </span>
             <span>Centralized reporting</span>
             <span> - </span>
@@ -161,7 +158,7 @@ function Login() {
         </div>
 
         <div className="login-footer">
-          Yobe State Health Operations - Internal Management Platform
+          Health Operations - Internal Management Platform
         </div>
       </section>
 
@@ -169,7 +166,7 @@ function Login() {
         <div className="login-card">
           <div className="mobile-brand">
             <div className="brand-logo"><img src="/images/ehealth-africa-logo.png" alt="eHealth Africa" /></div>
-            <strong>eHealth LC Manager</strong>
+            <strong>LCs Management System</strong>
           </div>
 
           <span className="eyebrow">WELCOME BACK</span>
@@ -218,8 +215,7 @@ function Login() {
           </form>
 
           <p className="login-disclaimer">
-            Access is restricted to authorized Yobe State health operations
-            personnel. Contact your system administrator if you need an account.
+            Access is restricted to authorized health operations personnel across the 15 programme states. Contact your system administrator if you need an account.
           </p>
           <p className="login-credit">Developed by Bashir Abubakar</p>
         </div>

@@ -5592,6 +5592,20 @@ tr:hover td {
   object-fit: contain;
 }
 
+.login-page .brand-lockup .brand-logo {
+  width: 68px;
+  height: 60px;
+}
+
+.login-page .mobile-brand .brand-logo {
+  width: 84px;
+  height: 68px;
+}
+
+.login-message {
+  margin: 36px auto;
+}
+
 .banner-mark {
   background: #FFFFFF;
   border-radius: 12px;

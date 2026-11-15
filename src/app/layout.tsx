@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "eHealth LC Manager | Yobe State",
+  title: "LCs Management System | Health Operations",
   description:
-    "Health operations, planning, monitoring and reporting platform for Yobe State.",
+    "Health operations, planning, monitoring and reporting platform across 15 programme states.",
 };
 
 export default function RootLayout({
